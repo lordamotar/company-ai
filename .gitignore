@@ -8,3 +8,6 @@ cratch/
 version/
 *.zip
 .venv/
+.tech/
+incoming/
+processed/
