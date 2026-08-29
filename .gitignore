@@ -1,0 +1,9 @@
+other/
+img/
+cratch/
+.agents/
+.chrome-debug/
+.chrome-debug-profile/
+.gstack/
+version/
+*.zip
