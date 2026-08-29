@@ -1,0 +1,41 @@
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: company-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: company
+      POSTGRES_USER: company_user
+      POSTGRES_PASSWORD: company_password
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+
+  n8n:
+    image: n8nio/n8n
+    container_name: company-n8n
+    restart: unless-stopped
+
+    ports:
+      - "5678:5678"
+
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin123
+      - TZ=Asia/Almaty
+
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+      - ./incoming:/files/incoming
+      - ./processed:/files/processed
+      - ./error:/files/error
+      - ./transcriptions:/files/transcriptions
+
+    depends_on:
+      - postgres

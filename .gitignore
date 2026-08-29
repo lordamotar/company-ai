@@ -7,3 +7,4 @@ cratch/
 .gstack/
 version/
 *.zip
+.venv/
