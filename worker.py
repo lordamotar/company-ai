@@ -107,7 +107,10 @@ def save_to_database(data, filename, text):
             %s, %s, %s, %s, %s, %s, %s, %s
         )
         ON CONFLICT (unique_id)
-        DO NOTHING
+        DO UPDATE SET 
+            text = EXCLUDED.text,
+            status = EXCLUDED.status,
+            source_file = EXCLUDED.source_file
         RETURNING id;
     """
 
@@ -139,12 +142,22 @@ def save_to_database(data, filename, text):
 def is_already_processed(unique_id):
     connection = psycopg2.connect(**DB_CONFIG)
     cursor = connection.cursor()
-    query = "SELECT 1 FROM call_transcriptions WHERE unique_id = %s;"
+    query = "SELECT text FROM call_transcriptions WHERE unique_id = %s;"
     cursor.execute(query, (unique_id,))
     result = cursor.fetchone()
     cursor.close()
     connection.close()
-    return result is not None
+    
+    if result is None:
+        return False
+        
+    db_text = result[0]
+    # Если текста нет или он является старой тестовой заглушкой,
+    # разрешаем обработать файл заново для записи реального текста
+    if not db_text or db_text == "ТЕСТОВАЯ ТРАНСКРИБАЦИЯ":
+        return False
+        
+    return True
 
 
 # Основная функция обработки медиафайла (mp3 или wav)
