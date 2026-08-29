@@ -7,6 +7,9 @@ cratch/
 .gstack/
 version/
 *.zip
+*.wav
+*.mp3
+*.txt
 .venv/
 .tech/
 incoming/
