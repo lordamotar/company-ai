@@ -224,9 +224,14 @@ def process_file(file_path):
             text
         )
 
-        # Проверяем статус вставки в БД
+        # 6. Запускаем полный анализ Tone of Voice и сохраняем 5 уровней в БД
         if inserted_id:
             logging.info(f"Файл {filename} успешно обработан. Запись сохранена в PostgreSQL (ID: {inserted_id}).")
+            try:
+                from ton_voice_processor import process_all_tone_voice
+                process_all_tone_voice(inserted_id, file_path, text)
+            except Exception as e:
+                logging.error(f"Ошибка при анализе Tone of Voice для {filename}: {e}", exc_info=True)
         else:
             logging.info(f"Файл {filename} обработан. Запись с таким Unique ID ({data['unique_id']}) уже существовала в базе данных (пропущено).")
 
