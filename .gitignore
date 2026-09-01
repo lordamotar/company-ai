@@ -10,7 +10,10 @@ version/
 *.wav
 *.mp3
 *.txt
+*.md
 .venv/
 .tech/
 incoming/
 processed/
+.env
+test/
