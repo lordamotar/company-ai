@@ -20,3 +20,6 @@ test/
 __pycache__/
 *.pyc
 *.pyo   
+postgres/
+n8n_data/
+*.log
