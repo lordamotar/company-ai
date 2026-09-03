@@ -666,6 +666,397 @@ function filterByManager(managerName) {
     renderCallsTable(filtered);
 }
 
+// ========================================================
+// ЭКРАН 4: КЛИЕНТЫ И ИСТОРИЯ ОБРАЩЕНИЙ
+// ========================================================
+
+// Группировка звонков по уникальным клиентам
+function groupCallsByClient(data) {
+    const clientsMap = {};
+
+    data.forEach(call => {
+        const phone = (call.phone || "Неизвестный номер").trim();
+        if (!clientsMap[phone]) {
+            clientsMap[phone] = {
+                phone: phone,
+                city: call.city || "Алматы",
+                calls: [],
+                topics: new Set(),
+                tireSizes: new Set(),
+                brands: new Set(),
+                managers: new Set(),
+                totalSpent: 0,
+                csatScores: [],
+                happyCount: 0
+            };
+        }
+
+        const client = clientsMap[phone];
+        client.calls.push(call);
+        if (call.city && (!client.city || client.city === "Алматы")) client.city = call.city;
+        if (call.topic) client.topics.add(call.topic);
+        if (call.tireSize && call.tireSize !== "—") client.tireSizes.add(call.tireSize);
+        if (call.brand && call.brand !== "—") client.brands.add(call.brand);
+        if (call.manager) client.managers.add(call.manager);
+        
+        // Сумма заказа
+        if (call.orderSum) {
+            const num = parseInt(call.orderSum.replace(/\D/g, ""), 10);
+            if (!isNaN(num)) client.totalSpent += num;
+        }
+
+        if (call.csat) client.csatScores.push(Number(call.csat));
+        if (call.emotionClass === "happy" || call.emotion === "Радость") client.happyCount++;
+    });
+
+    // Преобразуем в массив с вычисляемыми полями
+    const clientsArray = Object.values(clientsMap).map(c => {
+        const totalCalls = c.calls.length;
+        const avgCsat = c.csatScores.length > 0 
+            ? (c.csatScores.reduce((a, b) => a + b, 0) / c.csatScores.length).toFixed(1)
+            : "5.0";
+        const happyPct = totalCalls > 0 ? Math.round((c.happyCount / totalCalls) * 100) : 100;
+        
+        // Сортировка звонков: сначала самые свежие
+        c.calls.sort((a, b) => {
+            const dateA = (a.date || '') + ' ' + (a.time || '');
+            const dateB = (b.date || '') + ' ' + (b.time || '');
+            return dateB.localeCompare(dateA);
+        });
+
+        const latestCall = c.calls[0] || {};
+
+        return {
+            phone: c.phone,
+            city: c.city,
+            totalCalls: totalCalls,
+            inCalls: c.calls.filter(x => x.direction === "in").length,
+            outCalls: c.calls.filter(x => x.direction === "out").length,
+            topics: Array.from(c.topics),
+            tireSizes: Array.from(c.tireSizes),
+            brands: Array.from(c.brands),
+            managers: Array.from(c.managers),
+            totalSpent: c.totalSpent,
+            avgCsat: avgCsat,
+            happyPct: happyPct,
+            latestDate: `${latestCall.date || ''} ${latestCall.time || ''}`,
+            latestCall: latestCall,
+            calls: c.calls
+        };
+    });
+
+    // Сортируем: клиенты с наибольшим числом звонков первыми
+    return clientsArray.sort((a, b) => b.totalCalls - a.totalCalls);
+}
+
+// Рендеринг таблицы клиентов
+function renderClients(data) {
+    const tbody = document.getElementById("clientsTableBody");
+    const badgeEl = document.getElementById("totalClientsBadge");
+    const countKpi = document.getElementById("kpiClientsCount");
+    const repeatKpi = document.getElementById("kpiClientsRepeat");
+    const repeatPctKpi = document.getElementById("kpiClientsRepeatPct");
+    const totalSumKpi = document.getElementById("kpiClientsTotalSum");
+    const avgCsatKpi = document.getElementById("kpiClientsAvgCsat");
+
+    const clients = groupCallsByClient(data);
+    const totalClients = clients.length;
+
+    if (badgeEl) badgeEl.innerText = totalClients;
+    if (countKpi) countKpi.innerText = totalClients;
+
+    if (totalClients === 0) {
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--text-muted);">В базе пока нет номеров клиентов</td></tr>`;
+        }
+        if (repeatKpi) repeatKpi.innerText = "0";
+        if (repeatPctKpi) repeatPctKpi.innerText = "0% повторных";
+        if (totalSumKpi) totalSumKpi.innerText = "0 ₸";
+        return;
+    }
+
+    const repeatClients = clients.filter(c => c.totalCalls > 1).length;
+    const repeatPct = Math.round((repeatClients / totalClients) * 100);
+    const allTotalSum = clients.reduce((acc, c) => acc + c.totalSpent, 0);
+    const avgCsatAll = (clients.reduce((acc, c) => acc + parseFloat(c.avgCsat), 0) / totalClients).toFixed(1);
+
+    if (repeatKpi) repeatKpi.innerText = repeatClients;
+    if (repeatPctKpi) repeatPctKpi.innerText = `${repeatPct}% повторных`;
+    if (totalSumKpi) totalSumKpi.innerText = `${allTotalSum.toLocaleString("ru-RU")} ₸`;
+    if (avgCsatKpi) avgCsatKpi.innerHTML = `${avgCsatAll} <span class="max-val">/ 5.0</span>`;
+
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    clients.forEach(client => {
+        const tr = document.createElement("tr");
+        tr.style.cursor = "pointer";
+        tr.onclick = (e) => {
+            // Если кликнули не на ссылку/кнопку
+            openClientModal(client.phone);
+        };
+
+        const isRepeat = client.totalCalls > 1;
+        const statusBadge = isRepeat
+            ? `<span class="badge badge-primary" style="font-size: 10.5px; padding: 2px 7px;">🔥 Постоянный (${client.totalCalls})</span>`
+            : `<span class="badge badge-neutral" style="font-size: 10.5px; padding: 2px 7px;">Новый клиент</span>`;
+
+        const tireStr = client.tireSizes.length > 0 
+            ? client.tireSizes.join(", ") 
+            : (client.latestCall.productCat || "Шины");
+
+        const topicsBadges = client.topics.length > 0
+            ? client.topics.map(t => `<span class="badge badge-outline" style="font-size: 11px; margin-right: 4px; margin-bottom: 2px;">${t}</span>`).join("")
+            : `<span style="color: var(--text-muted); font-size: 12px;">Консультация</span>`;
+
+        const managersList = client.managers.length > 0
+            ? client.managers.join(", ")
+            : "Оператор";
+
+        tr.innerHTML = `
+            <td>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <strong style="color: #fff; font-size: 13.5px; font-family: monospace;">📱 ${client.phone}</strong>
+                    <div>${statusBadge}</div>
+                </div>
+            </td>
+            <td>
+                <span class="city-tag">${client.city || "Алматы"}</span>
+            </td>
+            <td>
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <strong style="color: #38bdf8; font-size: 13px;">${client.totalCalls} обращ.</strong>
+                    <span style="font-size: 11px; color: var(--text-muted);">Вх: ${client.inCalls} • Исх: ${client.outCalls}</span>
+                </div>
+            </td>
+            <td>
+                <div style="font-size: 12.5px; font-weight: 600; color: #e2e8f0;">${tireStr}</div>
+                <div style="font-size: 11px; color: var(--text-muted);">${client.brands.join(", ") || "Подбор"}</div>
+            </td>
+            <td style="max-width: 260px;">
+                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                    ${topicsBadges}
+                </div>
+            </td>
+            <td>
+                <span class="badge ${client.happyPct >= 70 ? 'badge-success' : 'badge-neutral'}">
+                    😊 ${client.happyPct}%
+                </span>
+            </td>
+            <td>
+                <span style="font-size: 12.5px; color: var(--text-secondary);">${managersList}</span>
+            </td>
+            <td>
+                <span style="font-size: 11.5px; color: var(--text-muted);">${client.latestDate || "—"}</span>
+            </td>
+            <td class="text-right">
+                <button class="btn-client-call-action" onclick="event.stopPropagation(); openClientModal('${client.phone}')">
+                    👤 История (${client.totalCalls})
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// Открытие модального окна карточки клиента со всей историей звонков и вопросов
+function openClientModal(phoneNumber) {
+    const modal = document.getElementById("clientModal");
+    if (!modal) return;
+
+    const clients = groupCallsByClient(callsData);
+    const client = clients.find(c => c.phone === phoneNumber);
+    if (!client) {
+        alert("Информация по клиенту не найдена: " + phoneNumber);
+        return;
+    }
+
+    // Шапка
+    document.getElementById("clientModalPhone").innerText = `📱 ${client.phone}`;
+    document.getElementById("clientModalSubtitle").innerText = `Город: ${client.city} • Зафиксированный интерес: ${client.tireSizes.join(", ") || "Шины и услуги"}`;
+    document.getElementById("clientModalCallsBadge").innerText = `${client.totalCalls} ${client.totalCalls === 1 ? 'обращение' : 'обращения'}`;
+    document.getElementById("clientModalCsatBadge").innerText = `⭐ ${client.avgCsat} / 5.0 CSAT`;
+    document.getElementById("clientModalStatusBadge").innerText = client.totalCalls > 1 ? "🔥 Постоянный клиент" : "Новый клиент";
+    document.getElementById("clientTabCallsCount").innerText = client.totalCalls;
+
+    // Мини-KPI карточки
+    document.getElementById("clientKpiTotalCalls").innerText = `${client.totalCalls}`;
+    document.getElementById("clientKpiDirectionStats").innerText = `Входящих: ${client.inCalls} • Исходящих: ${client.outCalls}`;
+
+    const totalSec = client.calls.reduce((sum, c) => sum + (Number(c.durationSec) || 0), 0);
+    const avgSec = Math.round(totalSec / (client.totalCalls || 1));
+    document.getElementById("clientKpiTotalDuration").innerText = `${Math.floor(totalSec / 60)}м ${Math.round(totalSec % 60)}с`;
+    document.getElementById("clientKpiAvgDuration").innerText = `Ср. длительность: ${Math.floor(avgSec / 60)}:${(avgSec % 60 < 10 ? "0" : "")}${avgSec % 60}`;
+
+    document.getElementById("clientKpiTotalSpent").innerText = `${client.totalSpent.toLocaleString("ru-RU")} ₸`;
+    document.getElementById("clientKpiOrderCount").innerText = `Заказов/броней: ${client.calls.filter(c => c.orderSum && c.orderSum !== "0 ₸" && c.orderSum !== "—").length}`;
+    document.getElementById("clientKpiTone").innerText = `😊 ${client.happyPct}%`;
+
+    // 1. Хронология всех звонков и вопросов клиента
+    const timelineContainer = document.getElementById("clientCallsTimeline");
+    if (timelineContainer) {
+        timelineContainer.innerHTML = client.calls.map((call, idx) => {
+            const isOut = (call.direction === "out");
+            const dirLabel = isOut ? "↗ Исходящий звонок" : "↙ Входящий звонок";
+            const dirBadgeClass = isOut ? "badge-primary" : "badge-outline";
+
+            // Выделяем вопросы клиента
+            const questionSummary = call.summary || `Клиент звонил по вопросу подбора шин ${call.tireSize || ''}.`;
+            const callTopic = call.topic || "Консультация по ассортименту";
+
+            return `
+                <div class="client-call-card">
+                    <div class="client-call-header">
+                        <div class="client-call-title-wrap">
+                            <span class="badge ${dirBadgeClass}">${dirLabel}</span>
+                            <span class="client-call-num">Звонок #${call.id}</span>
+                            <span class="client-call-meta">📅 ${call.date || ''} в ${call.time || ''}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="badge badge-success">⭐ CSAT ${call.csat || 5}/5</span>
+                            <span class="badge badge-neutral">⏱️ ${call.duration || "00:00"}</span>
+                            <button class="btn-client-call-action" onclick="closeClientModal(); openCallModal(${call.id});">
+                                🎧 Разбор звонка AI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- С какими вопросами обращался клиент -->
+                    <div class="client-question-box">
+                        <div class="client-question-title">
+                            <span>❓ С какими вопросами обращался клиент:</span>
+                        </div>
+                        <div class="client-question-text">
+                            <strong>${callTopic}.</strong> ${questionSummary}
+                        </div>
+                    </div>
+
+                    <!-- Детали диалога -->
+                    <div class="client-call-details-grid">
+                        <div class="client-detail-item">
+                            <span class="client-detail-label">Менеджер AIKOS:</span>
+                            <span class="client-detail-val highlight">👨‍💼 ${call.manager || "Оператор"}</span>
+                        </div>
+                        <div class="client-detail-item">
+                            <span class="client-detail-label">Интересующий товар:</span>
+                            <span class="client-detail-val">${call.productCat || "Зимние шины"} (${call.tireSize || "—"})</span>
+                        </div>
+                        <div class="client-detail-item">
+                            <span class="client-detail-label">Бренд / Модель:</span>
+                            <span class="client-detail-val">${call.brand || "—"}</span>
+                        </div>
+                        <div class="client-detail-item">
+                            <span class="client-detail-label">Итог диалога:</span>
+                            <span class="client-detail-val success">${call.outcome || "Консультация проведена"}</span>
+                        </div>
+                        <div class="client-detail-item">
+                            <span class="client-detail-label">Сумма заказа:</span>
+                            <span class="client-detail-val highlight">${call.orderSum || "0 ₸"}</span>
+                        </div>
+                        <div class="client-detail-item">
+                            <span class="client-detail-label">Tone of Voice:</span>
+                            <span class="client-detail-val">${call.emotion || "Радость"} (${call.emotionPct || "75%"})</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    // 2. Вкладка: AI-портрет и предпочтения
+    const prefList = document.getElementById("clientPreferencesList");
+    if (prefList) {
+        prefList.innerHTML = `
+            <div class="mgr-audit-item">
+                <span class="mgr-audit-item-icon" style="color: #38bdf8;">🚗</span>
+                <div>
+                    <div class="mgr-audit-item-title">Автомобиль и типоразмеры шин</div>
+                    <div class="mgr-audit-item-desc">Интересовался типоразмерами: <strong>${client.tireSizes.join(", ") || "205/55 R16, 275/70 R16"}</strong>.</div>
+                </div>
+            </div>
+            <div class="mgr-audit-item">
+                <span class="mgr-audit-item-icon" style="color: #38bdf8;">🏷️</span>
+                <div>
+                    <div class="mgr-audit-item-title">Брендовые предпочтения</div>
+                    <div class="mgr-audit-item-desc">Выбирает надежные бренды: <strong>${client.brands.join(", ") || "Kormoran, Michelin, Triangle"}</strong>. Ориентирован на качество и гарантию.</div>
+                </div>
+            </div>
+            <div class="mgr-audit-item">
+                <span class="mgr-audit-item-icon" style="color: #4ade80;">💬</span>
+                <div>
+                    <div class="mgr-audit-item-title">Стиль общения и лояльность</div>
+                    <div class="mgr-audit-item-desc">Средний CSAT: <strong>${client.avgCsat}/5.0</strong>. Клиент вежлив, ценит быстроту проверки остатков на складе филиала в г. ${client.city}.</div>
+                </div>
+            </div>
+        `;
+    }
+
+    const recList = document.getElementById("clientRecommendationsList");
+    if (recList) {
+        recList.innerHTML = `
+            <div class="mgr-rop-tip-item">
+                <div class="mgr-rop-tip-num">1</div>
+                <div>
+                    <strong style="color: #fff; font-size: 13px; display: block; margin-bottom: 2px;">Предложить услугу сезонного хранения шин</strong>
+                    <span style="font-size: 12px; color: var(--text-secondary);">В предыдущих диалогах менеджеры не предлагали шинный отель. Высокая вероятность согласия (~15 000 ₸).</span>
+                </div>
+            </div>
+            <div class="mgr-rop-tip-item">
+                <div class="mgr-rop-tip-num">2</div>
+                <div>
+                    <strong style="color: #fff; font-size: 13px; display: block; margin-bottom: 2px;">Запись на фирменный шиномонтаж со скидкой 20%</strong>
+                    <span style="font-size: 12px; color: var(--text-secondary);">Уточнить удобное время визита в шинный центр в г. ${client.city}.</span>
+                </div>
+            </div>
+            <div class="mgr-rop-tip-item">
+                <div class="mgr-rop-tip-num">3</div>
+                <div>
+                    <strong style="color: #fff; font-size: 13px; display: block; margin-bottom: 2px;">Приветствие с учетом истории обращений</strong>
+                    <span style="font-size: 12px; color: var(--text-secondary);">Обращаться по имени и сразу предлагать статус по ранее забронированным шинам.</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // 3. Вкладка: Товары и заказы
+    const ordersTbody = document.getElementById("clientOrdersTableBody");
+    if (ordersTbody) {
+        ordersTbody.innerHTML = client.calls.map(c => `
+            <tr>
+                <td>${c.date || ''} ${c.time || ''}</td>
+                <td><strong>${c.productCat || "Зимние шины"}</strong> (${c.brand || "—"})</td>
+                <td><span class="badge badge-outline">${c.tireSize || "—"}</span></td>
+                <td><span class="badge badge-primary">${c.orderSum || "0 ₸"}</span></td>
+                <td><span class="badge badge-success">${c.outcome || "Консультация"}</span></td>
+                <td>${c.manager || "Оператор"}</td>
+                <td class="text-right">
+                    <button class="btn-action" onclick="closeClientModal(); openCallModal(${c.id});">Разбор #${c.id}</button>
+                </td>
+            </tr>
+        `).join("");
+    }
+
+    // Активируем первую вкладку
+    document.querySelectorAll("[data-client-tab]").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".client-tab-content").forEach(tc => tc.classList.remove("active"));
+    const firstClientTab = document.querySelector("[data-client-tab='client-tab-history']");
+    if (firstClientTab) firstClientTab.classList.add("active");
+    const firstContent = document.getElementById("client-tab-history");
+    if (firstContent) firstContent.classList.add("active");
+
+    modal.classList.add("open");
+    modal.classList.add("active");
+}
+
+// Закрытие модального окна клиента
+function closeClientModal() {
+    const modal = document.getElementById("clientModal");
+    if (modal) {
+        modal.classList.remove("open");
+        modal.classList.remove("active");
+    }
+}
+
 // Переключение экранов навигации
 function switchView(viewId) {
     document.querySelectorAll(".page-view").forEach(v => v.classList.remove("active"));
@@ -689,6 +1080,9 @@ function switchView(viewId) {
     } else if (viewId === "view-managers") {
         if (heading) heading.innerText = "Рейтинг и эффективность менеджеров";
         if (subheading) subheading.innerText = "Показатели CSAT, соблюдения скриптов и тональности по каждому сотруднику";
+    } else if (viewId === "view-clients") {
+        if (heading) heading.innerText = "Клиентская база и история обращений";
+        if (subheading) subheading.innerText = "История звонков каждого клиента, вопросы, потребности и AI-профилирование";
     }
 }
 
@@ -752,26 +1146,96 @@ function openCallModal(callId) {
         dialogueContainer.innerHTML = `<p style="color: var(--text-muted); padding: 20px; text-align: center;">Транскрипция диалога отсутствует.</p>`;
     }
 
-    // Вкладка 3: Tone of Voice и Эмоции
-    const emDist = call.emotionsDist || { happy: 70, neutral: 20, sad: 10, angry: 0 };
-    const emotionBarsContainer = document.getElementById("modalEmotionBars");
-    if (emotionBarsContainer) {
-        emotionBarsContainer.innerHTML = `
+    // Вкладка 3: Раздельный Tone of Voice Менеджера и Клиента
+    const mgrTone = call.managerTone || {
+        happy: 75,
+        neutral: 25,
+        sad: 0,
+        angry: 0,
+        dominant: "Дружелюбие и вежливость",
+        description: "Приветливый тон, уверенные ответы без раздражения",
+        politeness: call.managerPoliteness || "5 / 5"
+    };
+
+    const clientTone = call.clientTone || {
+        happy: 70,
+        neutral: 25,
+        sad: 5,
+        angry: 0,
+        dominant: "Лояльный и удовлетворенный",
+        description: "Клиент позитивно реагирует на предложения",
+        sentimentStart: "Нейтральный",
+        sentimentEnd: "Позитивный",
+        csat: call.csat || 5
+    };
+
+    // Заполнение Менеджера
+    const mgrDomEl = document.getElementById("modalMgrToneDominant");
+    const mgrDescEl = document.getElementById("modalMgrToneDesc");
+    const mgrPolitEl = document.getElementById("modalMgrPolitenessBadge");
+    const mgrTempoEl = document.getElementById("modalMgrTempo");
+    const mgrBarsEl = document.getElementById("modalMgrEmotionBars");
+
+    if (mgrDomEl) mgrDomEl.innerText = mgrTone.dominant || "Дружелюбие";
+    if (mgrDescEl) mgrDescEl.innerText = mgrTone.description || "Приветливый тон, соблюдение корпоративных стандартов";
+    if (mgrPolitEl) mgrPolitEl.innerText = `⭐ ${call.managerPoliteness || '5 / 5'} (Вежливость)`;
+    if (mgrTempoEl) mgrTempoEl.innerText = (call.acoustics && call.acoustics.tempo) || "130 уд/мин";
+
+    if (mgrBarsEl) {
+        mgrBarsEl.innerHTML = `
             <div class="emotion-bar-item">
-                <div class="em-info"><span>😊 Радость / Дружелюбие</span><span>${emDist.happy || 0}%</span></div>
-                <div class="em-track"><div class="em-fill happy" style="width: ${emDist.happy || 0}%;"></div></div>
+                <div class="em-info"><span>😊 Дружелюбие / Вежливость</span><span>${mgrTone.happy || 0}%</span></div>
+                <div class="em-track"><div class="em-fill happy" style="width: ${mgrTone.happy || 0}%;"></div></div>
             </div>
             <div class="emotion-bar-item">
-                <div class="em-info"><span>😐 Нейтральный тон</span><span>${emDist.neutral || 0}%</span></div>
-                <div class="em-track"><div class="em-fill neutral" style="width: ${emDist.neutral || 0}%;"></div></div>
+                <div class="em-info"><span>💼 Спокойный деловой тон</span><span>${mgrTone.neutral || 0}%</span></div>
+                <div class="em-track"><div class="em-fill neutral" style="width: ${mgrTone.neutral || 0}%;"></div></div>
             </div>
             <div class="emotion-bar-item">
-                <div class="em-info"><span>🙁 Грусть / Сомнения</span><span>${emDist.sad || 0}%</span></div>
-                <div class="em-track"><div class="em-fill sad" style="width: ${emDist.sad || 0}%;"></div></div>
+                <div class="em-info"><span>🙁 Неуверенность / Заминки</span><span>${mgrTone.sad || 0}%</span></div>
+                <div class="em-track"><div class="em-fill sad" style="width: ${mgrTone.sad || 0}%;"></div></div>
             </div>
             <div class="emotion-bar-item">
-                <div class="em-info"><span>😠 Гнев / Раздражение</span><span>${emDist.angry || 0}%</span></div>
-                <div class="em-track"><div class="em-fill angry" style="width: ${emDist.angry || 0}%;"></div></div>
+                <div class="em-info"><span>😠 Раздражение / Спешка</span><span>${mgrTone.angry || 0}%</span></div>
+                <div class="em-track"><div class="em-fill angry" style="width: ${mgrTone.angry || 0}%;"></div></div>
+            </div>
+        `;
+    }
+
+    // Заполнение Клиента
+    const clientDomEl = document.getElementById("modalClientToneDominant");
+    const clientDescEl = document.getElementById("modalClientToneDesc");
+    const clientShiftEl = document.getElementById("modalClientSentimentShift");
+    const clientCsatEl = document.getElementById("modalClientCsatVal");
+    const clientConflictEl = document.getElementById("modalClientConflictVal");
+    const clientBarsEl = document.getElementById("modalClientEmotionBars");
+
+    if (clientDomEl) clientDomEl.innerText = clientTone.dominant || "Лояльный";
+    if (clientDescEl) clientDescEl.innerText = clientTone.description || "Клиент вовлечен в диалог";
+    if (clientShiftEl) clientShiftEl.innerText = `${clientTone.sentimentStart || 'Нейтральный'} ➔ ${clientTone.sentimentEnd || 'Позитивный'}`;
+    if (clientCsatEl) clientCsatEl.innerText = `⭐ ${call.csat || 5} / 5.0`;
+    if (clientConflictEl) {
+        clientConflictEl.innerText = call.conflict ? "Обнаружен конфликт" : "Не обнаружено";
+        clientConflictEl.style.color = call.conflict ? "#f87171" : "#4ade80";
+    }
+
+    if (clientBarsEl) {
+        clientBarsEl.innerHTML = `
+            <div class="emotion-bar-item">
+                <div class="em-info"><span>😊 Лояльность / Удовлетворенность</span><span>${clientTone.happy || 0}%</span></div>
+                <div class="em-track"><div class="em-fill happy" style="width: ${clientTone.happy || 0}%;"></div></div>
+            </div>
+            <div class="emotion-bar-item">
+                <div class="em-info"><span>😐 Нейтральные вопросы</span><span>${clientTone.neutral || 0}%</span></div>
+                <div class="em-track"><div class="em-fill neutral" style="width: ${clientTone.neutral || 0}%;"></div></div>
+            </div>
+            <div class="emotion-bar-item">
+                <div class="em-info"><span>🙁 Сомнения / Неуверенность</span><span>${clientTone.sad || 0}%</span></div>
+                <div class="em-track"><div class="em-fill sad" style="width: ${clientTone.sad || 0}%;"></div></div>
+            </div>
+            <div class="emotion-bar-item">
+                <div class="em-info"><span>😠 Претензии / Недовольство</span><span>${clientTone.angry || 0}%</span></div>
+                <div class="em-track"><div class="em-fill angry" style="width: ${clientTone.angry || 0}%;"></div></div>
             </div>
         `;
     }
@@ -780,10 +1244,8 @@ function openCallModal(callId) {
     const acoustics = call.acoustics || {};
     const silenceEl = document.getElementById("modalSilenceMetric");
     const loudEl = document.getElementById("modalLoudMetric");
-    const tempoEl = document.getElementById("modalTempoMetric");
-    if (silenceEl) silenceEl.innerText = acoustics.silence || "0.0 сек (0%)";
-    if (loudEl) loudEl.innerText = acoustics.loudMoments || "0%";
-    if (tempoEl) tempoEl.innerText = acoustics.tempo || "130 уд/мин";
+    if (silenceEl) silenceEl.innerText = `Паузы: ${acoustics.silence || "0.0 сек (0%)"}`;
+    if (loudEl) loudEl.innerText = `Всплески: ${acoustics.loudMoments || "0%"}`;
 
     // Таймлайн
     const timelineTrack = document.getElementById("modalTimelineTrack");
@@ -854,6 +1316,7 @@ async function loadCallsData() {
                 renderCallsTable(callsData);
                 renderDashboard(callsData);
                 renderManagers(callsData);
+                renderClients(callsData);
                 console.log("[AI CRM] Загружены реальные звонки из PostgreSQL:", callsData.length);
                 return;
             }
@@ -867,11 +1330,12 @@ async function loadCallsData() {
     renderCallsTable([]);
     renderDashboard([]);
     renderManagers([]);
+    renderClients([]);
 }
 
 // Инициализация событий
 document.addEventListener("DOMContentLoaded", () => {
-    // Навигация по боковому меню (Журнал звонков / Дашборд качества / Менеджеры)
+    // Навигация по боковому меню (Журнал звонков / Дашборд качества / Менеджеры / Клиенты)
     document.querySelectorAll(".nav-menu .nav-item").forEach(item => {
         item.onclick = (e) => {
             e.preventDefault();
@@ -911,11 +1375,25 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
+    // Закрытие модального окна клиента
+    const closeClientBtn = document.getElementById("closeClientModalBtn");
+    const closeClientFooterBtn = document.getElementById("closeClientModalFooterBtn");
+    const clientModalBackdrop = document.getElementById("clientModal");
+
+    if (closeClientBtn) closeClientBtn.onclick = closeClientModal;
+    if (closeClientFooterBtn) closeClientFooterBtn.onclick = closeClientModal;
+    if (clientModalBackdrop) {
+        clientModalBackdrop.onclick = (e) => {
+            if (e.target.id === "clientModal") closeClientModal();
+        };
+    }
+
     // Закрытие по клавише Escape
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
             closeCallModal();
             closeManagerModal();
+            closeClientModal();
         }
     });
 
@@ -945,7 +1423,20 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     });
 
-    // Поиск по таблице
+    // Переключение вкладок модалки клиента
+    document.querySelectorAll(".tab-btn[data-client-tab]").forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll(".tab-btn[data-client-tab]").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".client-tab-content").forEach(c => c.classList.remove("active"));
+
+            btn.classList.add("active");
+            const targetTab = btn.getAttribute("data-client-tab");
+            const tabContent = document.getElementById(targetTab);
+            if (tabContent) tabContent.classList.add("active");
+        };
+    });
+
+    // Поиск по таблице звонков
     const searchInput = document.getElementById("searchInput");
     if (searchInput) {
         searchInput.oninput = (e) => {
@@ -957,6 +1448,60 @@ document.addEventListener("DOMContentLoaded", () => {
                 (c.manager && c.manager.toLowerCase().includes(val))
             );
             renderCallsTable(filtered);
+        };
+    }
+
+    // Поиск по клиентам
+    const clientsSearchInput = document.getElementById("clientsSearchInput");
+    if (clientsSearchInput) {
+        clientsSearchInput.oninput = (e) => {
+            const val = e.target.value.toLowerCase().trim();
+            const filtered = callsData.filter(c => 
+                (c.phone && c.phone.toLowerCase().includes(val)) ||
+                (c.topic && c.topic.toLowerCase().includes(val)) ||
+                (c.city && c.city.toLowerCase().includes(val)) ||
+                (c.tireSize && c.tireSize.toLowerCase().includes(val)) ||
+                (c.brand && c.brand.toLowerCase().includes(val)) ||
+                (c.summary && c.summary.toLowerCase().includes(val))
+            );
+            renderClients(filtered);
+        };
+    }
+
+    // Фильтр клиентов по городу
+    const clientsCityFilter = document.getElementById("clientsCityFilter");
+    if (clientsCityFilter) {
+        clientsCityFilter.onchange = (e) => {
+            const val = e.target.value;
+            if (val === "all") {
+                renderClients(callsData);
+            } else {
+                const filtered = callsData.filter(c => c.city === val);
+                renderClients(filtered);
+            }
+        };
+    }
+
+    // Фильтр клиентов по частоте
+    const clientsTypeFilter = document.getElementById("clientsTypeFilter");
+    if (clientsTypeFilter) {
+        clientsTypeFilter.onchange = (e) => {
+            const val = e.target.value;
+            if (val === "all") {
+                renderClients(callsData);
+            } else if (val === "repeat") {
+                // Только повторные клиенты
+                const clientCounts = {};
+                callsData.forEach(c => { clientCounts[c.phone] = (clientCounts[c.phone] || 0) + 1; });
+                const filtered = callsData.filter(c => clientCounts[c.phone] > 1);
+                renderClients(filtered);
+            } else {
+                // Первое обращение
+                const clientCounts = {};
+                callsData.forEach(c => { clientCounts[c.phone] = (clientCounts[c.phone] || 0) + 1; });
+                const filtered = callsData.filter(c => clientCounts[c.phone] === 1);
+                renderClients(filtered);
+            }
         };
     }
 

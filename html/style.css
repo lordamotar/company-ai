@@ -955,6 +955,13 @@ body {
     margin-bottom: 16px;
 }
 
+.tone-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
 .tone-subtitle, .timeline-subtitle {
     font-size: 12px;
     color: var(--text-muted);
@@ -1631,5 +1638,155 @@ body {
     .manager-actions-row {
         grid-template-columns: 1fr;
     }
+}
+
+/* ========================================================
+   CLIENTS VIEW & TIMELINE STYLES
+   ======================================================== */
+.client-tab-content {
+    display: none;
+    flex-direction: column;
+    gap: 20px;
+    animation: fadeIn 0.2s ease;
+}
+
+.client-tab-content.active {
+    display: flex;
+}
+
+.client-calls-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.client-call-card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: all 0.2s ease;
+}
+
+.client-call-card:hover {
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    background: rgba(30, 41, 59, 0.5);
+}
+
+.client-call-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 12px;
+}
+
+.client-call-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.client-call-num {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.client-call-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.client-question-box {
+    background: rgba(59, 130, 246, 0.08);
+    border-left: 3px solid #3b82f6;
+    border-radius: 6px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.client-question-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #60a5fa;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.client-question-text {
+    font-size: 13.5px;
+    color: var(--text-primary);
+    line-height: 1.45;
+}
+
+.client-call-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 10px 14px;
+}
+
+.client-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.client-detail-label {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.client-detail-val {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.client-detail-val.highlight {
+    color: #38bdf8;
+}
+
+.client-detail-val.success {
+    color: #4ade80;
+}
+
+.client-detail-val.warning {
+    color: #facc15;
+}
+
+.btn-client-call-action {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15));
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    color: #c7d2fe;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-client-call-action:hover {
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    color: #fff;
+    border-color: transparent;
 }
 

@@ -223,6 +223,31 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
 
             script_score = int((sum(1 for i in checklist if i["passed"]) / len(checklist)) * 100)
 
+            mgr_lines = [d for d in dialogue if d.get("role") == "manager"]
+            client_lines = [d for d in dialogue if d.get("role") == "client"]
+
+            mgr_total = len(mgr_lines) or 1
+            client_total = len(client_lines) or 1
+
+            mgr_pos = sum(1 for d in mgr_lines if d.get("sentiment") == "positive")
+            mgr_neu = sum(1 for d in mgr_lines if d.get("sentiment") == "neutral")
+            mgr_neg = sum(1 for d in mgr_lines if d.get("sentiment") == "negative")
+
+            client_pos = sum(1 for d in client_lines if d.get("sentiment") == "positive")
+            client_neu = sum(1 for d in client_lines if d.get("sentiment") == "neutral")
+            client_neg = sum(1 for d in client_lines if d.get("sentiment") == "negative")
+
+            mgr_happy_pct = max(round((mgr_pos / mgr_total) * 100), 70 if manager_politeness >= 4 else 50)
+            mgr_neutral_pct = max(100 - mgr_happy_pct - (10 if mgr_neg > 0 else 0), 0)
+            mgr_sad_pct = 100 - mgr_happy_pct - mgr_neutral_pct
+
+            client_happy_pct = max(round((client_pos / client_total) * 100), 75 if csat >= 4 else 40)
+            client_neutral_pct = max(100 - client_happy_pct - (15 if client_neg > 0 else 5), 0)
+            client_sad_pct = 100 - client_happy_pct - client_neutral_pct
+
+            cust_start = r[23] if len(r) > 23 and r[23] else "Нейтральный"
+            cust_end = r[24] if len(r) > 24 and r[24] else ("Позитивный" if csat >= 4 else "Нейтральный")
+
             calls.append({
                 "id": call_id,
                 "uniqueId": unique_id,
@@ -257,6 +282,27 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
                     "neutral": neutral_score,
                     "sad": sad_score,
                     "angry": angry_score
+                },
+                "managerTone": {
+                    "happy": mgr_happy_pct,
+                    "neutral": mgr_neutral_pct,
+                    "sad": mgr_sad_pct,
+                    "angry": 0,
+                    "politeness": f"{manager_politeness} / 5",
+                    "politenessScore": manager_politeness,
+                    "dominant": "Дружелюбие и клиентоориентированность" if mgr_happy_pct >= 60 else "Спокойный деловой тон",
+                    "description": "Приветливый тон, уверенные ответы без конфликтов и раздражения"
+                },
+                "clientTone": {
+                    "happy": client_happy_pct,
+                    "neutral": client_neutral_pct,
+                    "sad": client_sad_pct,
+                    "angry": 0,
+                    "csat": csat,
+                    "sentimentStart": cust_start.capitalize(),
+                    "sentimentEnd": cust_end.capitalize(),
+                    "dominant": "Лояльный и удовлетворенный" if client_happy_pct >= 60 else "Нейтральная заинтересованность",
+                    "description": f"Настроение: от «{cust_start}» в начале до «{cust_end}» в конце диалога"
                 },
                 "acoustics": {
                     "rms": f"{mean_rms:.4f}",
