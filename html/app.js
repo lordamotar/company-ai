@@ -1564,6 +1564,113 @@ function renderAuditLogs(data) {
     });
 }
 
+// Динамическое наполнение выпадающего списка менеджеров из БД
+function populateManagerSelectOptions(currentManager = "") {
+    const mgrSelect = document.getElementById("editManagerSelect");
+    if (!mgrSelect) return;
+
+    // Собираем всех уникальных менеджеров из базы данных (callsData и auditLogsData)
+    const managersSet = new Set();
+    managersSet.add("Оператор");
+
+    if (Array.isArray(callsData)) {
+        callsData.forEach(c => {
+            if (c.manager && c.manager.trim() && c.manager !== "—") {
+                managersSet.add(c.manager.trim());
+            }
+        });
+    }
+
+    if (Array.isArray(auditLogsData)) {
+        auditLogsData.forEach(l => {
+            if (l.fieldName === "manager_name" && l.newValue && l.newValue.trim() && l.newValue !== "—") {
+                managersSet.add(l.newValue.trim());
+            }
+            if (l.currentManager && l.currentManager.trim() && l.currentManager !== "—") {
+                managersSet.add(l.currentManager.trim());
+            }
+        });
+    }
+
+    if (currentManager && currentManager.trim()) {
+        managersSet.add(currentManager.trim());
+    }
+
+    const defaultNames = ["Руслан", "Жандос", "Фарид"];
+    defaultNames.forEach(n => managersSet.add(n));
+
+    // Сортируем: 'Оператор' первым, затем реальные имена из БД по алфавиту, затем 'custom'
+    const otherManagers = Array.from(managersSet)
+        .filter(m => m !== "Оператор" && m !== "custom")
+        .sort((a, b) => a.localeCompare(b, "ru"));
+
+    mgrSelect.innerHTML = "";
+
+    const defaultOpt = document.createElement("option");
+    defaultOpt.value = "Оператор";
+    defaultOpt.textContent = "Оператор (Не определен)";
+    mgrSelect.appendChild(defaultOpt);
+
+    otherManagers.forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        mgrSelect.appendChild(opt);
+    });
+
+    const customOpt = document.createElement("option");
+    customOpt.value = "custom";
+    customOpt.textContent = "✏️ Другое имя (ввести вручную)...";
+    mgrSelect.appendChild(customOpt);
+}
+
+// Динамическое наполнение выпадающего списка городов из БД
+function populateCitySelectOptions(currentCity = "") {
+    const citySelect = document.getElementById("editCitySelect");
+    if (!citySelect) return;
+
+    const citiesSet = new Set();
+    const defaultCities = ["Алматы", "Астана", "Шымкент", "Караганда", "Актобе", "Тараз", "Павлодар", "Усть-Каменогорск", "Семей", "Атырау", "Костанай", "Кызылорда", "Уральск", "Петропавловск", "Актау"];
+    defaultCities.forEach(c => citiesSet.add(c));
+
+    if (Array.isArray(callsData)) {
+        callsData.forEach(c => {
+            if (c.city && c.city.trim() && c.city !== "—") {
+                citiesSet.add(c.city.trim());
+            }
+        });
+    }
+
+    if (Array.isArray(auditLogsData)) {
+        auditLogsData.forEach(l => {
+            if (l.fieldName === "city_name" && l.newValue && l.newValue.trim() && l.newValue !== "—") {
+                citiesSet.add(l.newValue.trim());
+            }
+        });
+    }
+
+    if (currentCity && currentCity.trim()) {
+        citiesSet.add(currentCity.trim());
+    }
+
+    const sortedCities = Array.from(citiesSet)
+        .filter(c => c !== "custom")
+        .sort((a, b) => a.localeCompare(b, "ru"));
+
+    citySelect.innerHTML = "";
+    sortedCities.forEach(city => {
+        const opt = document.createElement("option");
+        opt.value = city;
+        opt.textContent = city;
+        citySelect.appendChild(opt);
+    });
+
+    const customOpt = document.createElement("option");
+    customOpt.value = "custom";
+    customOpt.textContent = "✏️ Другой город (ввести вручную)...";
+    citySelect.appendChild(customOpt);
+}
+
 // Открытие модального окна редактирования звонка
 function openEditCallModal(callId) {
     console.log("[AI CRM] openEditCallModal вызван для звонка ID:", callId);
@@ -1581,15 +1688,21 @@ function openEditCallModal(callId) {
     if (titleEl) titleEl.innerText = `✏️ Корректировка данных звонка #${call.id}`;
     if (subtitleEl) subtitleEl.innerText = `Клиент: ${call.phone || '—'} • Дата: ${call.date || '—'} ${call.time || ''}`;
 
+    const currentMgr = (call.manager && call.manager.trim()) ? call.manager.trim() : "Оператор";
+    const currentCity = (call.city && call.city.trim()) ? call.city.trim() : "Алматы";
+
+    // Динамически заполняем списки актуальными именами и городами из БД
+    populateManagerSelectOptions(currentMgr);
+    populateCitySelectOptions(currentCity);
+
     const mgrSelect = document.getElementById("editManagerSelect");
     const mgrCustom = document.getElementById("editManagerCustom");
-    const currentMgr = call.manager || "Оператор";
 
     if (mgrSelect) {
         let mgrOptionExists = false;
         for (let opt of mgrSelect.options) {
-            if (opt.value === currentMgr) {
-                mgrSelect.value = currentMgr;
+            if (opt.value.toLowerCase() === currentMgr.toLowerCase()) {
+                mgrSelect.value = opt.value;
                 mgrOptionExists = true;
                 break;
             }
@@ -1610,13 +1723,12 @@ function openEditCallModal(callId) {
 
     const citySelect = document.getElementById("editCitySelect");
     const cityCustom = document.getElementById("editCityCustom");
-    const currentCity = call.city || "Алматы";
 
     if (citySelect) {
         let cityOptionExists = false;
         for (let opt of citySelect.options) {
-            if (opt.value === currentCity) {
-                citySelect.value = currentCity;
+            if (opt.value.toLowerCase() === currentCity.toLowerCase()) {
+                citySelect.value = opt.value;
                 cityOptionExists = true;
                 break;
             }
