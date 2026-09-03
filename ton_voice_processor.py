@@ -90,7 +90,11 @@ def process_audio_features(call_id, file_path, cursor):
             call_id, round(mean_rms, 4), round(max_rms, 4), round(loud_pct, 2),
             round(silent_duration_sec, 2), round(silence_pct, 2), round(active_speech_sec, 2), round(speech_tempo, 1)
         ))
-        logging.info(f"[Тон 1] Акустический анализ сохранен для call_id={call_id}")
+
+        # Обновляем длительность в таблице транскрипций
+        cursor.execute("UPDATE call_transcriptions SET duration_sec = %s WHERE id = %s;", (round(float(duration), 2), call_id))
+
+        logging.info(f"[Тон 1] Акустический анализ и длительность ({duration:.1f} сек) сохранены для call_id={call_id}")
     except Exception as e:
         logging.error(f"[Тон 1] Ошибка при расчете акустических параметров: {e}", exc_info=True)
 
@@ -369,6 +373,13 @@ def process_all_tone_voice(call_id, file_path, transcript_text):
         conn.commit()
         
         logging.info(f"=== Все 5 уровней Tone of Voice успешно записаны в БД для call_id={call_id} ===")
+
+        # 6. Автоматически обновляем html/calls_data.json для моментального отображения на веб-странице
+        try:
+            from export_db_to_json import export_calls_to_json
+            export_calls_to_json()
+        except Exception as err:
+            logging.warning(f"Не удалось обновить html/calls_data.json: {err}")
     except Exception as e:
         conn.rollback()
         logging.error(f"Критическая ошибка при обработке Tone of Voice: {e}", exc_info=True)

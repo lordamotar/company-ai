@@ -42,55 +42,134 @@ DB_CONFIG = {
 }
 
 
-FILENAME_PATTERN = re.compile(
-    r"^rg-\d+-(\d+)-(\d{8})-(\d{6})-(\d+\.\d+)\.(mp3|wav)$",
+AUDIO_EXTENSIONS = ('.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac', '.wma')
+
+# Паттерны имен файлов АТС
+# 1. Входящие: rg-5555-87014662990-20201113-150553-1605258353.53425.wav
+PATTERN_INCOMING = re.compile(
+    r"^(?:rg|in|incoming)-\d+-(\d+)-(\d{8})-(\d{6})-(\d+\.\d+)\.([a-z0-9]+)$",
+    re.IGNORECASE
+)
+
+# 2. Исходящие: out-87479049469-1004-20201209-103647-1607488607.77991.wav
+PATTERN_OUTGOING = re.compile(
+    r"^(?:out|outgoing)-(\d+)-\d+-(\d{8})-(\d{6})-(\d+\.\d+)\.([a-z0-9]+)$",
+    re.IGNORECASE
+)
+
+# 3. Общий паттерн звонков с датой и временем
+PATTERN_GENERAL = re.compile(
+    r"^(?:[a-z0-9_-]+-)?(\d{10,12})-.*?(\d{8})-(\d{6})-(\d+\.\d+)\.([a-z0-9]+)$",
     re.IGNORECASE
 )
 
 
-def parse_filename(filename):
-    match = FILENAME_PATTERN.match(filename)
+def parse_filename(filename, file_path=None):
+    filename = os.path.basename(filename)
+    extension = os.path.splitext(filename)[1].lstrip(".").lower()
 
-    if not match:
-        raise ValueError(
-            f"Не удалось разобрать имя файла: {filename}"
-        )
+    # 1. Проверяем паттерн входящего звонка (rg-...)
+    m_in = PATTERN_INCOMING.match(filename)
+    if m_in:
+        phone, date_str, time_str, unique_id, _ = m_in.groups()
+        call_date = datetime.strptime(date_str, "%Y%m%d").date()
+        call_time = datetime.strptime(time_str, "%H%M%S").time()
+        ts_dt = datetime.fromtimestamp(float(unique_id), tz=timezone.utc)
+        return {
+            "phone": phone,
+            "call_date": call_date,
+            "call_time": call_time,
+            "unique_id": unique_id,
+            "unix_timestamp": ts_dt,
+            "extension": extension,
+            "direction": "in"
+        }
 
-    phone = match.group(1)
-    date_str = match.group(2)
-    time_str = match.group(3)
-    unique_id = match.group(4)
-    extension = match.group(5)
+    # 2. Проверяем паттерн исходящего звонка (out-...)
+    m_out = PATTERN_OUTGOING.match(filename)
+    if m_out:
+        phone, date_str, time_str, unique_id, _ = m_out.groups()
+        call_date = datetime.strptime(date_str, "%Y%m%d").date()
+        call_time = datetime.strptime(time_str, "%H%M%S").time()
+        ts_dt = datetime.fromtimestamp(float(unique_id), tz=timezone.utc)
+        return {
+            "phone": phone,
+            "call_date": call_date,
+            "call_time": call_time,
+            "unique_id": unique_id,
+            "unix_timestamp": ts_dt,
+            "extension": extension,
+            "direction": "out"
+        }
 
-    call_date = datetime.strptime(
-        date_str, "%Y%m%d"
-    ).date()
+    # 3. Проверяем общий паттерн
+    m_gen = PATTERN_GENERAL.match(filename)
+    if m_gen:
+        phone, date_str, time_str, unique_id, _ = m_gen.groups()
+        call_date = datetime.strptime(date_str, "%Y%m%d").date()
+        call_time = datetime.strptime(time_str, "%H%M%S").time()
+        ts_dt = datetime.fromtimestamp(float(unique_id), tz=timezone.utc)
+        return {
+            "phone": phone,
+            "call_date": call_date,
+            "call_time": call_time,
+            "unique_id": unique_id,
+            "unix_timestamp": ts_dt,
+            "extension": extension,
+            "direction": "out" if filename.lower().startswith("out") else "in"
+        }
 
-    call_time = datetime.strptime(
-        time_str, "%H%M%S"
-    ).time()
+    # 4. Универсальный fallback для любых аудиофайлов
+    phone_match = re.search(r"\b(\d{10,12})\b", filename)
+    phone = phone_match.group(1) if phone_match else "Клиент"
 
-    unix_timestamp = float(unique_id)
+    date_match = re.search(r"\b(20\d{6})\b", filename)
+    time_match = re.search(r"\b(\d{6})\b", filename)
 
-    timestamp_dt = datetime.fromtimestamp(
-        unix_timestamp,
-        tz=timezone.utc
-    )
+    now = datetime.now()
+    call_date = datetime.strptime(date_match.group(1), "%Y%m%d").date() if date_match else now.date()
+    call_time = datetime.strptime(time_match.group(1), "%H%M%S").time() if time_match else now.time()
+
+    uid_match = re.search(r"(\d{10}\.\d+)", filename)
+    if uid_match:
+        unique_id = uid_match.group(1)
+        ts_dt = datetime.fromtimestamp(float(unique_id), tz=timezone.utc)
+    else:
+        mtime = os.path.getmtime(file_path) if file_path and os.path.exists(file_path) else now.timestamp()
+        unique_id = f"{int(mtime)}.{abs(hash(filename)) % 100000}"
+        ts_dt = datetime.fromtimestamp(mtime, tz=timezone.utc)
 
     return {
         "phone": phone,
         "call_date": call_date,
         "call_time": call_time,
         "unique_id": unique_id,
-        "unix_timestamp": timestamp_dt,
+        "unix_timestamp": ts_dt,
         "extension": extension,
+        "direction": "out" if filename.lower().startswith("out") else "in"
     }
 
 
 def save_to_database(data, filename, text):
     connection = psycopg2.connect(**DB_CONFIG)
-
     cursor = connection.cursor()
+
+    # Автоматическое определение имени менеджера из текста
+    manager_name = "Оператор"
+    if text:
+        m = re.search(r'[«"]?[Ээ]йкос[»"]?\s*[,–-]?\s*([А-ЯЁ][а-яё]{2,})', text)
+        if m and m.group(1).lower() not in ["звоню", "слушаю", "добрый", "здравствуйте", "день", "компания"]:
+            manager_name = m.group(1).capitalize()
+        elif re.search(r'меня\s+([А-ЯЁ][а-яё]{2,})\s+зовут', text, re.I):
+            manager_name = re.search(r'меня\s+([А-ЯЁ][а-яё]{2,})\s+зовут', text, re.I).group(1).capitalize()
+        elif re.search(r'меня\s+зовут\s+([А-ЯЁ][а-яё]{2,})', text, re.I):
+            manager_name = re.search(r'меня\s+зовут\s+([А-ЯЁ][а-яё]{2,})', text, re.I).group(1).capitalize()
+        else:
+            names = ["Жандос", "Руслан", "Азамат", "Данияр", "Айбек", "Ербол", "Максим", "Алексей"]
+            for n in names:
+                if re.search(rf'\b{n}\b', text[:300], re.I):
+                    manager_name = n
+                    break
 
     query = """
         INSERT INTO call_transcriptions (
@@ -101,16 +180,18 @@ def save_to_database(data, filename, text):
             unix_timestamp,
             text,
             source_file,
-            status
+            status,
+            manager_name
         )
         VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s
+            %s, %s, %s, %s, %s, %s, %s, %s, %s
         )
         ON CONFLICT (unique_id)
         DO UPDATE SET 
             text = EXCLUDED.text,
             status = EXCLUDED.status,
-            source_file = EXCLUDED.source_file
+            source_file = EXCLUDED.source_file,
+            manager_name = EXCLUDED.manager_name
         RETURNING id;
     """
 
@@ -125,6 +206,7 @@ def save_to_database(data, filename, text):
             text,
             filename,
             "completed",
+            manager_name,
         )
     )
 
@@ -160,6 +242,69 @@ def is_already_processed(unique_id):
     return True
 
 
+def transcribe_with_gemini(file_path, output_txt_path=None):
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("Переменная GEMINI_API_KEY не найдена в файле .env")
+
+    from google import genai
+    client = genai.Client(api_key=api_key)
+
+    abs_path = os.path.abspath(file_path)
+    if not os.path.exists(abs_path):
+        raise FileNotFoundError(f"Файл не найден: {abs_path}")
+
+    filename = os.path.basename(abs_path)
+    logging.info(f"Загрузка аудиофайла {filename} на серверы Google Gemini...")
+    audio_file = client.files.upload(file=abs_path)
+    logging.info(f"Файл {filename} загружен в Gemini API. Имя объекта: {audio_file.name}")
+
+    prompt = (
+        "Сделай дословную и максимально качественную транскрипцию этого телефонного разговора на русском языке. "
+        "Обязательно раздели диалог на реплики Менеджера и Клиента:\n"
+        "**Менеджер:** <реплика>\n"
+        "**Клиент:** <реплика>\n"
+        "Не добавляй вступительных слов и пояснений от себя, верни только диалог."
+    )
+
+    models_to_try = ["gemini-3.6-flash", "gemini-2.5-flash"]
+    text = None
+
+    for model_name in models_to_try:
+        try:
+            logging.info(f"Вызов Gemini API ({model_name}) для транскрибации...")
+            response = client.models.generate_content(
+                model=model_name,
+                contents=[audio_file, prompt]
+            )
+            text = response.text.strip()
+            if text:
+                logging.info(f"Успешный ответ от {model_name}.")
+                break
+        except Exception as e:
+            logging.warning(f"Ошибка при вызове {model_name}: {e}")
+
+    # Удаляем временный файл на сервере Google
+    try:
+        client.files.delete(name=audio_file.name)
+    except Exception:
+        pass
+
+    if not text:
+        raise RuntimeError("Не удалось получить транскрипцию от Gemini API.")
+
+    # Сохраняем в текстовый файл
+    if output_txt_path:
+        os.makedirs(os.path.dirname(os.path.abspath(output_txt_path)), exist_ok=True)
+        with open(output_txt_path, "w", encoding="utf-8") as f:
+            f.write(text)
+
+    return text
+
+
 # Основная функция обработки медиафайла (mp3 или wav)
 def process_file(file_path):
     filename = os.path.basename(file_path)
@@ -180,44 +325,13 @@ def process_file(file_path):
         output_txt_name = os.path.splitext(filename)[0] + ".txt"
         output_txt_path = os.path.join(TRANSCRIPTIONS_DIR, output_txt_name)
 
-        # 3. Вызываем локальный транскрибатор быстрее-whisper через корневое окружение .venv
-        transcriber_dir = os.path.join(BASE_DIR, "transcriber")
-        import subprocess
-
-        # Путь к интерпретатору python в корневом .venv проекте
-        python_exe = os.path.join(BASE_DIR, ".venv", "Scripts", "python.exe")
-        cmd = [
-            python_exe,
-            "local_transcribe.py",
-            file_path,
-            output_txt_path
-        ]
-
-        logging.info(f"Запуск транскрибации для {filename}: {' '.join(cmd)}")
-        result = subprocess.run(
-            cmd,
-            cwd=transcriber_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="ignore"
-        )
-
-        # Если скрипт транскрибации завершился с ошибкой, бросаем исключение
-        if result.returncode != 0:
-            raise RuntimeError(f"Ошибка транскрибатора (код {result.returncode}): {result.stderr or result.stdout}")
-
-        # 4. Считываем распознанный текст из созданного файла
-        if not os.path.exists(output_txt_path):
-            raise FileNotFoundError(f"Файл транскрипции не был создан: {output_txt_path}")
-
-        with open(output_txt_path, "r", encoding="utf-8") as f:
-            text = f.read().strip()
+        # 3. Транскрибация звонка через Google Gemini 3.6 Flash
+        logging.info(f"Запуск транскрибации через Gemini 3.6 Flash для {filename}...")
+        text = transcribe_with_gemini(file_path, output_txt_path)
 
         logging.info(f"Транскрибация завершена. Длина текста: {len(text)} символов.")
 
-        # 5. Записываем полученные метаданные и текст в БД PostgreSQL
+        # 4. Записываем полученные метаданные и текст в БД PostgreSQL
         inserted_id = save_to_database(
             data,
             filename,
@@ -248,9 +362,9 @@ class MP3Handler(FileSystemEventHandler):
         if event.is_directory:
             return
 
-        # Проверяем расширение файла (.mp3 или .wav)
-        ext = event.src_path.lower()
-        if not (ext.endswith(".mp3") or ext.endswith(".wav")):
+        # Проверяем расширение аудиофайла
+        ext = os.path.splitext(event.src_path)[1].lower()
+        if ext not in AUDIO_EXTENSIONS:
             return
 
         # Отправляем файл на обработку
@@ -259,7 +373,7 @@ class MP3Handler(FileSystemEventHandler):
 
 # Точка входа в программу
 def main():
-    logging.info("Запуск COMPANY AI - CALL WATCHER")
+    logging.info("Запуск COMPANY AI - CALL WATCHER (Входящие и Исходящие звонки)")
     
     # Создаем необходимые директории (входящие файлы и текстовые транскрипции)
     os.makedirs(INCOMING_DIR, exist_ok=True)
@@ -270,9 +384,9 @@ def main():
     # Обработка уже существующих файлов в папке incoming при старте скрипта
     try:
         existing_files = os.listdir(INCOMING_DIR)
-        files = [f for f in existing_files if f.lower().endswith('.mp3') or f.lower().endswith('.wav')]
+        files = [f for f in existing_files if os.path.splitext(f)[1].lower() in AUDIO_EXTENSIONS]
         if files:
-            logging.info(f"Найдено существующих файлов при старте: {len(files)}")
+            logging.info(f"Найдено существующих аудиофайлов при старте: {len(files)}")
             for file_name in files:
                 file_path = os.path.join(INCOMING_DIR, file_name)
                 process_file(file_path)
@@ -289,7 +403,7 @@ def main():
     )
     observer.start()
 
-    logging.info("Ожидание новых MP3/WAV файлов...")
+    logging.info("Ожидание новых аудиофайлов (входящие rg-*, исходящие out-*, любые audio)...")
 
     try:
         # Бесконечный цикл работы службы

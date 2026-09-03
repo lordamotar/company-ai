@@ -1,0 +1,3500 @@
+[
+  {
+    "id": 7,
+    "uniqueId": "1607917545.80408",
+    "phone": "87024133114",
+    "direction": "out",
+    "directionLabel": "Исходящий звонок",
+    "date": "14.12.2020",
+    "time": "09:45:45",
+    "duration": "02:51",
+    "durationSec": 171.44,
+    "manager": "Руслан",
+    "topic": "Шины R15-R16 275/70/16",
+    "city": "Алматы",
+    "productCat": "Зимние шины",
+    "tireSize": "275/70/16",
+    "brand": "Шины R15-R16",
+    "orderSum": "87 000 ₸",
+    "outcome": "Консультация проведена",
+    "emotion": "Радость",
+    "emotionPct": "77.7%",
+    "emotionClass": "happy",
+    "csat": 5,
+    "scriptScore": 75,
+    "status": "Обработан",
+    "statusClass": "badge-success",
+    "managerPoliteness": "5 / 5",
+    "conflict": false,
+    "summary": "Разговор прошел в вежливой и конструктивной манере. Менеджер эффективно помог клиенту оформить заказ, а также предложил выгодное решение по участию в акции.",
+    "opportunity": "Предложить сезонное хранение шин и расширенную гарантию.",
+    "emotionsDist": {
+      "happy": 77.74,
+      "neutral": 19.82,
+      "sad": 0.39,
+      "angry": 2.06
+    },
+    "acoustics": {
+      "rms": "0.0296",
+      "silence": "34.2 сек (20.0%)",
+      "loudMoments": "10.7%",
+      "tempo": "133.9 уд/мин"
+    },
+    "timeline": [
+      {
+        "time": "00:00",
+        "emotion": "happy",
+        "pct": 99.99
+      },
+      {
+        "time": "00:10",
+        "emotion": "happy",
+        "pct": 98.13
+      },
+      {
+        "time": "00:20",
+        "emotion": "happy",
+        "pct": 96.79
+      },
+      {
+        "time": "00:30",
+        "emotion": "happy",
+        "pct": 91.67
+      },
+      {
+        "time": "00:40",
+        "emotion": "happy",
+        "pct": 96.05
+      },
+      {
+        "time": "00:50",
+        "emotion": "neutral",
+        "pct": 90.9
+      },
+      {
+        "time": "01:00",
+        "emotion": "happy",
+        "pct": 68.97
+      },
+      {
+        "time": "01:10",
+        "emotion": "happy",
+        "pct": 96.21
+      },
+      {
+        "time": "01:20",
+        "emotion": "happy",
+        "pct": 99.33
+      },
+      {
+        "time": "01:30",
+        "emotion": "happy",
+        "pct": 66.61
+      },
+      {
+        "time": "01:40",
+        "emotion": "happy",
+        "pct": 68.69
+      },
+      {
+        "time": "01:50",
+        "emotion": "happy",
+        "pct": 93.77
+      },
+      {
+        "time": "02:00",
+        "emotion": "happy",
+        "pct": 90.75
+      },
+      {
+        "time": "02:10",
+        "emotion": "happy",
+        "pct": 93.86
+      },
+      {
+        "time": "02:20",
+        "emotion": "happy",
+        "pct": 65.23
+      },
+      {
+        "time": "02:30",
+        "emotion": "happy",
+        "pct": 87.55
+      },
+      {
+        "time": "02:40",
+        "emotion": "happy",
+        "pct": 74.86
+      },
+      {
+        "time": "02:50",
+        "emotion": "neutral",
+        "pct": 93.76
+      }
+    ],
+    "dialogue": [
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Алло.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Алло, здравствуйте.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Здравствуйте.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Меня зовут Руслан, я с компании Эйкас. У нас на сайте сделали заказ шин.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А, да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Максис 275 70 16. Верно?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да-да, да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Ага. Могу узнать, в каком городе вам нужны шины?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "В Астане.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "В Астане. Отлично, в Астане как раз есть последний комплект. Мы можем резерв поставить, да, на ваше имя?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "М-м.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Заберёте же?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Когда планируете забрать примерно?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Так, э-э, размер там какой был?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "275 70R16.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Э-э, 750, это...",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Максис.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "70, это выше, чем 65, 60, да? Это же выше же?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А, наоборот, там, не наоборот, выше надо.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Угу. Подходит размер?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Так.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да, подходит. 270, а 270 нету?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Нет, такого нету.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Всё, подходит.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Угу.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Смотрите, вы здесь указали своё ТОО, а на ТОО сделать счёт на оплату или как физлицо будете покупать?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да, да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "На ТОО.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "На ТОО.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Теперь смотрите, хочу вам сразу сказать то, что у нас сейчас проходит розыгрыш, в котором разыгрывается автомобиль. И ещё призы на общую сумму 10 миллионов тенге. К сожалению, в этой акции участвуют только физлица, а, юрлица сразу не могут участвовать. Если есть возможность, можете купить как физлицо и участвовать в розыгрыше.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "М-м.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Так.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Блин, ну давайте на физлицо тогда оформим.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "На физлицо, да?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Так, тогда смотрите, когда сможете забрать шины?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Э, так, завтра только.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "**Mенеджер:** Завтра, да? Смотрите, Алаш 42 знаете, да, адрес наш, филиал?",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да-да, знаю, знаю.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Алаш 42. Я на Алаш 42 поставлю шины в резерв, там последний комплект. Скажите, пожалуйста, на чью фамилию, имя поставить резерв, кто будет забирать?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Байдуллаев Нурлан.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Байдуллаев, два Л.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Два Л?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Байдуллаев, да, Байдуллаев Нурлан.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Это вы, да?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Угу. Всё, ваш номер тоже запишу сейчас. Всё, тогда завтра на Алаш 42 проедете, а, скажете то, что на сайте сделали заказ шин и то, что с вами оператор связывался, в резерв шины поставили, хорошо?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Всё, хорошо.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Чтобы они резерв нашли, а то последний комплект.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "М-м, хорошо.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Всё, спасибо, что обратились в нашу компанию. Всего хорошего, до свидания.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "До свидания.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "До свидания.",
+        "sentiment": "neutral"
+      }
+    ],
+    "checklist": [
+      {
+        "title": "Приветствие и имя компании",
+        "desc": "Представился: «Компания Эйкос, Руслан»",
+        "passed": true
+      },
+      {
+        "title": "Выявление потребности и размера",
+        "desc": "Уточнил параметры: 275/70/16",
+        "passed": true
+      },
+      {
+        "title": "Уточнение города и наличия",
+        "desc": "Филиал: город Алматы",
+        "passed": true
+      },
+      {
+        "title": "Допродажа сопутствующих услуг",
+        "desc": "Не предложено сезонное хранение шин",
+        "passed": false
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "uniqueId": "1604652884.43624",
+    "phone": "87014911924",
+    "direction": "in",
+    "directionLabel": "Входящий звонок",
+    "date": "06.11.2020",
+    "time": "14:54:44",
+    "duration": "09:56",
+    "durationSec": 596.52,
+    "manager": "Руслан",
+    "topic": "Nokian / Nordman / Michelin 205/55/16",
+    "city": "Шымкент",
+    "productCat": "Зимние шины",
+    "tireSize": "205/55/16",
+    "brand": "Nokian / Nordman / Michelin",
+    "orderSum": "87 000 ₸",
+    "outcome": "Консультация проведена",
+    "emotion": "Радость",
+    "emotionPct": "73.0%",
+    "emotionClass": "happy",
+    "csat": 4,
+    "scriptScore": 100,
+    "status": "Обработан",
+    "statusClass": "badge-success",
+    "managerPoliteness": "5 / 5",
+    "conflict": false,
+    "summary": "Разговор проходил в вежливой и информативной манере. Менеджер подробно консультировал по продукции и ценам, но желаемая модель шин оказалась недоступна в городе клиента, что привело к поиску альтернатив.",
+    "opportunity": "Все допродажи выполнены успешно.",
+    "emotionsDist": {
+      "happy": 73.03,
+      "neutral": 24.04,
+      "sad": 2.84,
+      "angry": 0.09
+    },
+    "acoustics": {
+      "rms": "0.0160",
+      "silence": "250.1 сек (41.9%)",
+      "loudMoments": "14.2%",
+      "tempo": "133.9 уд/мин"
+    },
+    "timeline": [
+      {
+        "time": "00:00",
+        "emotion": "happy",
+        "pct": 99.99
+      },
+      {
+        "time": "00:10",
+        "emotion": "happy",
+        "pct": 66.15
+      },
+      {
+        "time": "00:20",
+        "emotion": "happy",
+        "pct": 95.23
+      },
+      {
+        "time": "00:30",
+        "emotion": "happy",
+        "pct": 82.49
+      },
+      {
+        "time": "00:40",
+        "emotion": "happy",
+        "pct": 97.97
+      },
+      {
+        "time": "00:50",
+        "emotion": "happy",
+        "pct": 93.09
+      },
+      {
+        "time": "01:00",
+        "emotion": "happy",
+        "pct": 95.12
+      },
+      {
+        "time": "01:10",
+        "emotion": "happy",
+        "pct": 93.8
+      },
+      {
+        "time": "01:20",
+        "emotion": "happy",
+        "pct": 55.16
+      },
+      {
+        "time": "01:30",
+        "emotion": "happy",
+        "pct": 91.53
+      },
+      {
+        "time": "01:40",
+        "emotion": "happy",
+        "pct": 96.48
+      },
+      {
+        "time": "01:50",
+        "emotion": "happy",
+        "pct": 98.64
+      },
+      {
+        "time": "02:00",
+        "emotion": "happy",
+        "pct": 96.64
+      },
+      {
+        "time": "02:10",
+        "emotion": "happy",
+        "pct": 90.92
+      },
+      {
+        "time": "02:20",
+        "emotion": "happy",
+        "pct": 98.78
+      },
+      {
+        "time": "02:30",
+        "emotion": "happy",
+        "pct": 58.31
+      },
+      {
+        "time": "02:40",
+        "emotion": "neutral",
+        "pct": 73.07
+      },
+      {
+        "time": "02:50",
+        "emotion": "happy",
+        "pct": 95.9
+      },
+      {
+        "time": "03:00",
+        "emotion": "neutral",
+        "pct": 75.71
+      },
+      {
+        "time": "03:10",
+        "emotion": "neutral",
+        "pct": 67.87
+      },
+      {
+        "time": "03:20",
+        "emotion": "happy",
+        "pct": 93.8
+      },
+      {
+        "time": "03:30",
+        "emotion": "happy",
+        "pct": 99.59
+      },
+      {
+        "time": "03:40",
+        "emotion": "neutral",
+        "pct": 63.64
+      },
+      {
+        "time": "03:50",
+        "emotion": "happy",
+        "pct": 98.68
+      },
+      {
+        "time": "04:00",
+        "emotion": "neutral",
+        "pct": 61.08
+      },
+      {
+        "time": "04:10",
+        "emotion": "happy",
+        "pct": 98.83
+      },
+      {
+        "time": "04:20",
+        "emotion": "happy",
+        "pct": 99.45
+      },
+      {
+        "time": "04:30",
+        "emotion": "happy",
+        "pct": 99.34
+      },
+      {
+        "time": "04:40",
+        "emotion": "happy",
+        "pct": 95.71
+      },
+      {
+        "time": "04:50",
+        "emotion": "happy",
+        "pct": 96.05
+      },
+      {
+        "time": "05:00",
+        "emotion": "happy",
+        "pct": 99.75
+      },
+      {
+        "time": "05:10",
+        "emotion": "neutral",
+        "pct": 66.43
+      },
+      {
+        "time": "05:20",
+        "emotion": "neutral",
+        "pct": 99.24
+      },
+      {
+        "time": "05:30",
+        "emotion": "happy",
+        "pct": 62.97
+      },
+      {
+        "time": "05:40",
+        "emotion": "happy",
+        "pct": 97.25
+      },
+      {
+        "time": "05:50",
+        "emotion": "sad",
+        "pct": 46.43
+      },
+      {
+        "time": "06:00",
+        "emotion": "happy",
+        "pct": 40.83
+      },
+      {
+        "time": "06:10",
+        "emotion": "happy",
+        "pct": 99.79
+      },
+      {
+        "time": "06:20",
+        "emotion": "happy",
+        "pct": 51.85
+      },
+      {
+        "time": "06:30",
+        "emotion": "neutral",
+        "pct": 90.05
+      },
+      {
+        "time": "06:40",
+        "emotion": "neutral",
+        "pct": 81.41
+      },
+      {
+        "time": "06:50",
+        "emotion": "happy",
+        "pct": 99.64
+      },
+      {
+        "time": "07:00",
+        "emotion": "happy",
+        "pct": 86.37
+      },
+      {
+        "time": "07:10",
+        "emotion": "happy",
+        "pct": 88.82
+      },
+      {
+        "time": "07:20",
+        "emotion": "happy",
+        "pct": 97.37
+      },
+      {
+        "time": "07:30",
+        "emotion": "happy",
+        "pct": 99.24
+      },
+      {
+        "time": "07:40",
+        "emotion": "happy",
+        "pct": 99.84
+      },
+      {
+        "time": "07:50",
+        "emotion": "happy",
+        "pct": 96.84
+      },
+      {
+        "time": "08:00",
+        "emotion": "neutral",
+        "pct": 51.41
+      },
+      {
+        "time": "08:10",
+        "emotion": "happy",
+        "pct": 62.53
+      },
+      {
+        "time": "08:20",
+        "emotion": "neutral",
+        "pct": 82.83
+      },
+      {
+        "time": "08:30",
+        "emotion": "neutral",
+        "pct": 61.68
+      },
+      {
+        "time": "08:40",
+        "emotion": "neutral",
+        "pct": 99.56
+      },
+      {
+        "time": "08:50",
+        "emotion": "happy",
+        "pct": 98.96
+      },
+      {
+        "time": "09:00",
+        "emotion": "neutral",
+        "pct": 57.68
+      },
+      {
+        "time": "09:10",
+        "emotion": "happy",
+        "pct": 88.19
+      },
+      {
+        "time": "09:20",
+        "emotion": "happy",
+        "pct": 99.28
+      },
+      {
+        "time": "09:30",
+        "emotion": "happy",
+        "pct": 97.78
+      },
+      {
+        "time": "09:40",
+        "emotion": "happy",
+        "pct": 86.51
+      },
+      {
+        "time": "09:50",
+        "emotion": "happy",
+        "pct": 90.8
+      }
+    ],
+    "dialogue": [
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Добрый день, компания \"Эйкос\", Руслан.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Здравствуйте. Я попал в город Шымкент или это линия общая по всему Казахстану?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Общая линия по всему Казахстану, наверное.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А, всё, хорошо, понятно. Я б... Я хотел узнать цены на шины Nokian 205 55 16.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "205 55 16...",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Зимние.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "...зимние. А какой именно: Hakkapeliitta или Nordman?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Наверное Nordman, скорее всего. А чем они отличаются, Hakkapeliitta от Nordman?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "205 55 16, да?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Смотрите, вообще раньше Nokian Hakkapeliitta выпускала только. Была Hakkapeliitta 5, Hakkapeliitta 7, 8, сейчас уже новая Hakkapeliitta 9 идет.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Угу.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Потом производители решили сделать качественную резину, но более доступную, более бюджетную... более бюджетный вариант резины сделать. Вообще Nokian изначально они формировались как премиальная... премиальный бренд, премиальная шина. Они делали только такую прямо... лидерскую шину. Потом начали делать, выпускать под брендом Nordman резину. То есть более бюджетную, ну тем не менее, как заявляют производители, то что они выпускали всегда премиальные и хорошие шины, они сделали качественную и бюджетную шину, чтоб людям было как бы дозволено взять шины не только дорогие, но и подешевле. То есть поэтому они выпустили сейчас линейку Nordman.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Угу.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "То есть шина тоже будет качественная. Единственное, чуть там резиновая смесь изменена, чтоб сделать более бюджетную версию. Резиновую смесь поменяли чуть-чуть, производство в России поставили... завод. Ну чтоб было доступно человеку купить шину. Поэтому выпускают...",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да, я поэтому и спрашиваю именно про эти шины.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Ага. Вот, а так резина качественная в любом случае. Единственное вот бюджетная. Как бы... Ну допустим смотрите...",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Вы мне цену можете сказать 205 55 16 сколько будет стоить?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Смотрите, Hakkapeliitta 8-я будет стоить 32 900.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ага.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Hakkapeliitta 9-я – 41 700.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ага.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "И Nordman... Nordman 5 будет стоить 23 400.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "23 400, да?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Угу.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ясно. А там какие-нибудь скидки, что-нибудь... вообще есть, если четыре шины сразу покупать? Предусматриваются?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Смотрите, как таковой скидки на саму шину нету, однако есть приятные бонусы от компании нашей \"Эйкос\". Есть бесплатный шиномонтаж.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Угу.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "То есть вы у нас покупаете шину и бесплатно переобуваетесь. Плюс мы очень часто розыгрываем акции, розыгрыши. И сейчас как раз идет розыгрыш, который пройдет 15 января, будет разыгрываться автомобиль и еще куча разных призов на общую сумму 10 миллионов тенге. Туда входят техника, шины, сертификаты разного рода. То есть за счет этого как бы приятные бонусы есть для клиентов наших. Ну а так, как таковой скидки на резину мы не предусматриваем. Тем более сейчас сезон, шина влет уходит и как бы только вот бонусы.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А в Шымкене... Вы можете мне сказать, в Шымкенте в наличии есть вот эти вот Nordman, которые стоят 23 400?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Конечно могу. Сейчас, секундочку. Так, Nordman 5. Шымкент, Шымкент... А, нам не показывало, что в Шымкенте есть, оказывается. В Кызылорде они. В Шымкенте нет, к сожалению. Я думал...",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Вот этой размерности нету, да?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А еще вы можете мне подсказывать вот именно в Шымкенте в пределах вот э-э вот этой суммы какие у вас еще есть зимние шины? Или это самые дешевые у вас?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "В пределах 23-25 тысяч?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ну, желательно, чтоб не превышало 23 000.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Желательно, чтоб не про... Сейчас посмотрим. Так...",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Именно вот этой размерности.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да-да, я понял, сейчас посмотрим. Так, именно шипованная, да, ищете?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Нет, шипованная мне не нужна, мне липучка. Шипованная не интересует.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "А, липучка нужна. Смотрите, я шипованные версии вообще вам говорил. Липучка есть Nokian Nordman тоже. Сейчас посмотрим...",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А она должна стоить дешевле, да, чем шипованная?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Nordman 5 просто такая более устаревшая модель, а вот эта Nordman липучка RS2, она более новая модель. Поэтому она будет 25 900 стоить.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "М-м, ясно.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Так, сейчас еще посмотрим какие-нибудь, что у нас есть из липучек. Тоже качественное чтобы было. Так, так, так, так. Ну смотрите, э-э есть Sava бренд шины, Словения выпускает.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Угу.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "По 22 200. Сейчас по наличию посмотрю сперва. Так, так, так, так, так. Словения, резина липучка, да. Они тоже в Кызылорде. Так... Так, они тоже в Кызылорде. Сейчас еще посмотрим, что ещё можно хорошего подобрать. Cormoran есть по 21 750. Э-э липучка. Э-э Cormoran – это дочерняя компания Michelin. Тоже к...",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Как называются, еще раз скажите э-э название?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Cormoran.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Cormoran. Э-э так, по 21 700, да?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да, 21 750.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Всё хорошо. А они в наличии четыре штуки там будут?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Последний комплект, да, остался. Тоже шина очень хорошая, тоже ходовая модель. По мягкости всё хорошее. Ну, сами знаете, наверное, компанию Michelin, это ихняя дочерняя компания, они занимаются...",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Угу, угу. Э-э вы можете сказать мне точно адрес в Шымкенте?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Темирлановское шоссе, 53А. Давайте сразу эту резину, наверное, на резерв поставим под ваше имя, чтоб не про...",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "53А?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "53А. Да, зарезервируйте. И до скольки работают?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Так, сейчас скажу. Темирлановское шоссе... До 6 сегодня. Завтра, послезавтра выходной у них.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Блин, у меня работа тоже до 6. Я думал, они хотя бы до 8 работают.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Только в будни. Сейчас, тем более, карантин, вот эти все моменты. Ну стараемся до поздна не работать.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ну давайте вы пока сейчас э-э забронируйте вот эти шины, а я сейчас супруге скажу, чтобы она поехала и переобулась. А там э-э вот этот, э-э то есть э-э смена шин полностью бесплатно дается, да? Делается?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Так... На эту на этот бренд сейчас посмотрим, точно скажу. Так, так, так, так, так. На Nokian 100% делался бесплатный шиномонтаж. На этот бренд сейчас посмотрим. А на нее скидка будет 20%.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "20% скидка?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Это получается... если они мне обойдутся в 80... 100 000, у меня получится 84... м-м ну 87 000, да, где-то у меня получится? 20% скидки.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Так, 21 750 умножаем на 4: 87. 87 000 за шины отдадите и в районе 3-3,5 тысяч за шиномонтаж со скидкой.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Сколько за шины отдам?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "87 ровно.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А, получается, цена указана уже со скидкой здесь?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Нет. Я вам говорю ши... шина 21 750 стоит.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ага.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "А скидка на шиномонтаж будет 20%.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "И сколько она будет стоить, шиномонтаж?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "В районе 3-3,5. То есть шины 87 будут и плюс шиномонтаж 3-3,5, где-то 90-91 000 выйдет.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Всё отлично. Ладно, я вам перезвоню потом, хорошо? Спасибо.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Хорошо. Резерв не ставить?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Нет...",
+        "sentiment": "negative"
+      }
+    ],
+    "checklist": [
+      {
+        "title": "Приветствие и имя компании",
+        "desc": "Представился: «Компания Эйкос, Руслан»",
+        "passed": true
+      },
+      {
+        "title": "Выявление потребности и размера",
+        "desc": "Уточнил параметры: 205/55/16",
+        "passed": true
+      },
+      {
+        "title": "Уточнение города и наличия",
+        "desc": "Филиал: город Шымкент",
+        "passed": true
+      },
+      {
+        "title": "Допродажа сопутствующих услуг",
+        "desc": "Предложил сезонное хранение / шиномонтаж",
+        "passed": true
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "uniqueId": "1603360093.23019",
+    "phone": "87475129363",
+    "direction": "in",
+    "directionLabel": "Входящий звонок",
+    "date": "22.10.2020",
+    "time": "15:48:13",
+    "duration": "02:54",
+    "durationSec": 174.4,
+    "manager": "Оператор",
+    "topic": "Cordiant / Sailun 215/50/R17",
+    "city": "Астана",
+    "productCat": "Зимние шины",
+    "tireSize": "215/50/R17",
+    "brand": "Cordiant / Sailun",
+    "orderSum": "87 000 ₸",
+    "outcome": "Консультация проведена",
+    "emotion": "Радость",
+    "emotionPct": "87.2%",
+    "emotionClass": "happy",
+    "csat": 5,
+    "scriptScore": 50,
+    "status": "Обработан",
+    "statusClass": "badge-success",
+    "managerPoliteness": "5 / 5",
+    "conflict": false,
+    "summary": "Разговор был информативным и вежливым. Клиент получил подробную информацию о наличии и ценах на шины, а менеджер проявил готовность помочь, предоставив несколько альтернатив.",
+    "opportunity": "Предложить сезонное хранение шин и расширенную гарантию.",
+    "emotionsDist": {
+      "happy": 87.22,
+      "neutral": 11.98,
+      "sad": 0.78,
+      "angry": 0.02
+    },
+    "acoustics": {
+      "rms": "0.0280",
+      "silence": "61.0 сек (35.0%)",
+      "loudMoments": "11.7%",
+      "tempo": "117.2 уд/мин"
+    },
+    "timeline": [
+      {
+        "time": "00:00",
+        "emotion": "happy",
+        "pct": 99.99
+      },
+      {
+        "time": "00:10",
+        "emotion": "neutral",
+        "pct": 64.91
+      },
+      {
+        "time": "00:20",
+        "emotion": "happy",
+        "pct": 96.21
+      },
+      {
+        "time": "00:30",
+        "emotion": "happy",
+        "pct": 52.21
+      },
+      {
+        "time": "00:40",
+        "emotion": "happy",
+        "pct": 98.89
+      },
+      {
+        "time": "00:50",
+        "emotion": "happy",
+        "pct": 99.88
+      },
+      {
+        "time": "01:00",
+        "emotion": "happy",
+        "pct": 99.5
+      },
+      {
+        "time": "01:10",
+        "emotion": "happy",
+        "pct": 96.6
+      },
+      {
+        "time": "01:20",
+        "emotion": "happy",
+        "pct": 97.16
+      },
+      {
+        "time": "01:30",
+        "emotion": "happy",
+        "pct": 99.87
+      },
+      {
+        "time": "01:40",
+        "emotion": "happy",
+        "pct": 87.03
+      },
+      {
+        "time": "01:50",
+        "emotion": "happy",
+        "pct": 97.06
+      },
+      {
+        "time": "02:00",
+        "emotion": "happy",
+        "pct": 97.24
+      },
+      {
+        "time": "02:10",
+        "emotion": "happy",
+        "pct": 72.65
+      },
+      {
+        "time": "02:20",
+        "emotion": "happy",
+        "pct": 94.08
+      },
+      {
+        "time": "02:30",
+        "emotion": "happy",
+        "pct": 62.76
+      },
+      {
+        "time": "02:40",
+        "emotion": "happy",
+        "pct": 92.7
+      },
+      {
+        "time": "02:50",
+        "emotion": "happy",
+        "pct": 99.11
+      }
+    ],
+    "dialogue": [
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Добрый день, компания «Экос-Ферит».",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Здравствуйте.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Здравствуйте.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Э-э я вот хотел уточнить, у вас есть шина Yokohama 215/50 R17 зимние? Нету, да?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Блин. А Matador?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Matador есть. Размер какой?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Так, туда размер 185/65 R14.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Так, Matador... Шипованные или липучка?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Нет, не шипованная.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Город какой?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А-а Астана, Нур-Султан.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Пару минут. В Нур-Султане, да, есть.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Есть, да? По какой цене они?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "А-а 16 200.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "16 200. Ага. А вот на 17-й, который я сказал, есть какая-нибудь альтернатива? Там, может Toyo, что-нибудь такое?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Toyo тоже у нас нету.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А что у вас есть на 17?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Ещё раз размер скажите.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "215/50 R17. Шипованную даже.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "А-а Sailun есть — 22 700. Есть Maxxis — 30 500.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ага. А вот этот Sailun, он производство что?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Китай.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ага.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Maxxis — Тайвань, а-а потом есть Dunlop, Финляндия, 41 100.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ага.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Goodyear, Польша — 50 000.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ага.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Э-э так... И Cordiant есть шипованный — 28 900.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Cordiant шипованный... 28 900, да, вы сказали?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Угу.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ага. Всё, хорошо. Тогда я могу в любое, да, в Астане поехать, вот на Алаш, например?",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Э-э ну не в любой, там в принципе... Кургальджинское шоссе есть и Сейфуллина. Всё равно резины по разным местам разбросаны.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да? А-а. Просто видите, я вот здесь везде звоню, короче, никто ничего не отвечает.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "На шоссе Алаш звонили? На 69 66 69?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да, и на домашку, и на телефон. И на Сейфуллина звонил, на домашку, на телефон, никто не отвечает.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Хм. Всё хорошо. Ну просто, видимо, клиентов у них много.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А-а, всё хорошо, спасибо.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Угу, до свидания.",
+        "sentiment": "neutral"
+      }
+    ],
+    "checklist": [
+      {
+        "title": "Приветствие и имя компании",
+        "desc": "Не назвал компанию/имя",
+        "passed": false
+      },
+      {
+        "title": "Выявление потребности и размера",
+        "desc": "Уточнил параметры: 215/50/R17",
+        "passed": true
+      },
+      {
+        "title": "Уточнение города и наличия",
+        "desc": "Филиал: город Астана",
+        "passed": true
+      },
+      {
+        "title": "Допродажа сопутствующих услуг",
+        "desc": "Не предложено сезонное хранение шин",
+        "passed": false
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "uniqueId": "1602837647.19527",
+    "phone": "87756453758",
+    "direction": "in",
+    "directionLabel": "Входящий звонок",
+    "date": "16.10.2020",
+    "time": "14:40:47",
+    "duration": "01:35",
+    "durationSec": 95.6,
+    "manager": "Оператор",
+    "topic": "Шины R15-R16 205/65 R15",
+    "city": "Алматы",
+    "productCat": "Зимние шины",
+    "tireSize": "205/65 R15",
+    "brand": "Шины R15-R16",
+    "orderSum": "87 000 ₸",
+    "outcome": "Консультация проведена",
+    "emotion": "Радость",
+    "emotionPct": "61.2%",
+    "emotionClass": "happy",
+    "csat": 5,
+    "scriptScore": 50,
+    "status": "Обработан",
+    "statusClass": "badge-success",
+    "managerPoliteness": "5 / 5",
+    "conflict": true,
+    "summary": "Разговор начался с раздражения клиента из-за невозможности дозвониться, но менеджер вежливо и полно ответил на все вопросы о графике работы и способах оплаты. Клиент завершил звонок удовлетворенным полученной информацией.",
+    "opportunity": "Предложить сезонное хранение шин и расширенную гарантию.",
+    "emotionsDist": {
+      "happy": 61.21,
+      "neutral": 37.73,
+      "sad": 0.71,
+      "angry": 0.36
+    },
+    "acoustics": {
+      "rms": "0.0652",
+      "silence": "13.6 сек (14.2%)",
+      "loudMoments": "10.0%",
+      "tempo": "117.2 уд/мин"
+    },
+    "timeline": [
+      {
+        "time": "00:00",
+        "emotion": "happy",
+        "pct": 99.96
+      },
+      {
+        "time": "00:10",
+        "emotion": "happy",
+        "pct": 71.48
+      },
+      {
+        "time": "00:20",
+        "emotion": "happy",
+        "pct": 87.49
+      },
+      {
+        "time": "00:30",
+        "emotion": "happy",
+        "pct": 83.81
+      },
+      {
+        "time": "00:40",
+        "emotion": "neutral",
+        "pct": 60.81
+      },
+      {
+        "time": "00:50",
+        "emotion": "happy",
+        "pct": 67.7
+      },
+      {
+        "time": "01:00",
+        "emotion": "neutral",
+        "pct": 62.81
+      },
+      {
+        "time": "01:10",
+        "emotion": "neutral",
+        "pct": 87.88
+      },
+      {
+        "time": "01:20",
+        "emotion": "neutral",
+        "pct": 81.46
+      },
+      {
+        "time": "01:30",
+        "emotion": "happy",
+        "pct": 97.21
+      }
+    ],
+    "dialogue": [
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Добрый день, компания «Элит Фаворит». Алло.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Алло, здравствуйте.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Здравствуйте.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Я хотела бы узнать, вот вы до скольки работаете в будничные дни и до скольки в выходные? Со скольки до скольки вот чтобы это... Потому что звоню по номерам, у меня такое впечатление...",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "А в каком городе спрашиваете?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Нур-Султан.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Пара минут... Нур-Султан в субботу до четырёх работает.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Хорошо, а...",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "А в будние дни до 20:00.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Тогда скажите ещё, пожалуйста, действующие телефоны у нас, потому что ни один набираю...",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Нет, есть, есть действующие телефоны: 69-66-69.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ну не поднимает никто совершенно. И не... и вот этот магазин шин, да, вот который билайновский номер, тоже никто не поднимает.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Всё хорошо... Нет, они есть, просто там, видите, наверное, клиентов много или ещё что-то. Они должны поднимать: 69-66-69.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А в будние дни это точно они до восьми работают?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да, до восьми.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "И ещё скажите, пожалуйста, это... рассчитываться можно и карточкой, и наличными? Карточкой любого банка и это...",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да, всё верно. Visa либо Mastercard.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А, например, а если пополам, можно так? Или то... только конкретно или конкретно карточкой, или конкретно наличными?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Нет, пополам можно.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Можно, да? Всё... Всё, хорошо, спасибо. До свидания.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Угу, всего доброго, до свидания.",
+        "sentiment": "neutral"
+      }
+    ],
+    "checklist": [
+      {
+        "title": "Приветствие и имя компании",
+        "desc": "Не назвал компанию/имя",
+        "passed": false
+      },
+      {
+        "title": "Выявление потребности и размера",
+        "desc": "Уточнил параметры: 205/65 R15",
+        "passed": true
+      },
+      {
+        "title": "Уточнение города и наличия",
+        "desc": "Филиал: город Алматы",
+        "passed": true
+      },
+      {
+        "title": "Допродажа сопутствующих услуг",
+        "desc": "Не предложено сезонное хранение шин",
+        "passed": false
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "uniqueId": "1605864369.64637",
+    "phone": "87771508228",
+    "direction": "in",
+    "directionLabel": "Входящий звонок",
+    "date": "20.11.2020",
+    "time": "15:26:09",
+    "duration": "01:48",
+    "durationSec": 108.29,
+    "manager": "Руслан",
+    "topic": "Шины R15-R16 205/65 R15",
+    "city": "Алматы",
+    "productCat": "Зимние шины",
+    "tireSize": "205/65 R15",
+    "brand": "Шины R15-R16",
+    "orderSum": "87 000 ₸",
+    "outcome": "Консультация проведена",
+    "emotion": "Радость",
+    "emotionPct": "88.6%",
+    "emotionClass": "happy",
+    "csat": 4,
+    "scriptScore": 100,
+    "status": "Обработан",
+    "statusClass": "badge-success",
+    "managerPoliteness": "4 / 5",
+    "conflict": false,
+    "summary": "Клиент выражает сильное возмущение и недовольство сервисом в филиале, связанным с отказом в приеме шин на хранение. Менеджер внимательно выслушивает, уточняет детали и обещает разобраться в ситуации, завершая разговор предложением перезвонить после выяснения.",
+    "opportunity": "Все допродажи выполнены успешно.",
+    "emotionsDist": {
+      "happy": 88.57,
+      "neutral": 11.08,
+      "sad": 0.28,
+      "angry": 0.07
+    },
+    "acoustics": {
+      "rms": "0.0242",
+      "silence": "45.6 сек (42.1%)",
+      "loudMoments": "13.4%",
+      "tempo": "126.0 уд/мин"
+    },
+    "timeline": [
+      {
+        "time": "00:00",
+        "emotion": "happy",
+        "pct": 99.8
+      },
+      {
+        "time": "00:10",
+        "emotion": "happy",
+        "pct": 99.94
+      },
+      {
+        "time": "00:20",
+        "emotion": "happy",
+        "pct": 97.14
+      },
+      {
+        "time": "00:30",
+        "emotion": "happy",
+        "pct": 77.42
+      },
+      {
+        "time": "00:40",
+        "emotion": "happy",
+        "pct": 64.08
+      },
+      {
+        "time": "00:50",
+        "emotion": "happy",
+        "pct": 89.72
+      },
+      {
+        "time": "01:00",
+        "emotion": "happy",
+        "pct": 94.49
+      },
+      {
+        "time": "01:10",
+        "emotion": "happy",
+        "pct": 99.06
+      },
+      {
+        "time": "01:20",
+        "emotion": "happy",
+        "pct": 70.8
+      },
+      {
+        "time": "01:30",
+        "emotion": "happy",
+        "pct": 99.22
+      },
+      {
+        "time": "01:40",
+        "emotion": "happy",
+        "pct": 82.58
+      }
+    ],
+    "dialogue": [
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Андрей, ты что там? Добрый день, компания «Эйкос», Руслан.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Здравствуйте.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Здравствуйте.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Вас как зовут?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Руслан.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Меня зовут Вячеслав.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Очень приятно, Вячеслав.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А, Руслан, подскажите, пожалуйста, город Алматы, филиал на Жандосова... Э-э давайте, машина... хотим сдать на сезонное хранение шины, и и говорят, что менеджера нету, это невозможно, забирайте свои шины отсюда. Там беременная девушка, то есть что, она должна переть эти шины на на своем горбу, что ли?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Не понял, еще раз. Хран- На хранение шины оставляли?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Хотим оставить, никто не может принять.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Приехать у вас забрать их, что ли?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Нет, машина там, колёса тоже там.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "И теперь предлагают девушке, чтоб сама?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ей говорят: «Уезжайте отсюда со своими шинами вместе».",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Не будем на хранение оставлять?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да, «никто не может принять их на хранение, ваши шины».",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "На Жандосова, да?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да. Разберитесь, пожалуйста, что это такое? Я понимаю, там там кого-то нет на месте, но там армия людей работает.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Сейчас, секундочку, ваш номер запишу.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Угу.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Подождёте минут пять, я перезвоню вам, хорошо?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Хорошо, жду.",
+        "sentiment": "positive"
+      }
+    ],
+    "checklist": [
+      {
+        "title": "Приветствие и имя компании",
+        "desc": "Представился: «Компания Эйкос, Руслан»",
+        "passed": true
+      },
+      {
+        "title": "Выявление потребности и размера",
+        "desc": "Уточнил параметры: 205/65 R15",
+        "passed": true
+      },
+      {
+        "title": "Уточнение города и наличия",
+        "desc": "Филиал: город Алматы",
+        "passed": true
+      },
+      {
+        "title": "Допродажа сопутствующих услуг",
+        "desc": "Предложил сезонное хранение / шиномонтаж",
+        "passed": true
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "uniqueId": "1605258353.53425",
+    "phone": "87014662990",
+    "direction": "in",
+    "directionLabel": "Входящий звонок",
+    "date": "13.11.2020",
+    "time": "15:05:53",
+    "duration": "04:03",
+    "durationSec": 243.3,
+    "manager": "Жандос",
+    "topic": "Cordiant / Winter Drive 205/65/15",
+    "city": "Алматы",
+    "productCat": "Зимние шины",
+    "tireSize": "205/65/15",
+    "brand": "Cordiant / Winter Drive",
+    "orderSum": "87 000 ₸",
+    "outcome": "Консультация проведена",
+    "emotion": "Радость",
+    "emotionPct": "55.4%",
+    "emotionClass": "happy",
+    "csat": 5,
+    "scriptScore": 75,
+    "status": "Обработан",
+    "statusClass": "badge-success",
+    "managerPoliteness": "5 / 5",
+    "conflict": false,
+    "summary": "Разговор начался с обычного запроса о товаре. Менеджер был вежлив, информативен и проактивен, отвечая на все вопросы клиента и организовывая бронирование. Тон беседы оставался спокойным, профессиональным и в итоге позитивным.",
+    "opportunity": "Предложить сезонное хранение шин и расширенную гарантию.",
+    "emotionsDist": {
+      "happy": 55.39,
+      "neutral": 32.69,
+      "sad": 11.15,
+      "angry": 0.78
+    },
+    "acoustics": {
+      "rms": "0.0453",
+      "silence": "57.4 сек (23.6%)",
+      "loudMoments": "9.6%",
+      "tempo": "133.9 уд/мин"
+    },
+    "timeline": [
+      {
+        "time": "00:00",
+        "emotion": "happy",
+        "pct": 99.99
+      },
+      {
+        "time": "00:10",
+        "emotion": "happy",
+        "pct": 99.99
+      },
+      {
+        "time": "00:20",
+        "emotion": "happy",
+        "pct": 99.92
+      },
+      {
+        "time": "00:30",
+        "emotion": "happy",
+        "pct": 62.41
+      },
+      {
+        "time": "00:40",
+        "emotion": "happy",
+        "pct": 88.28
+      },
+      {
+        "time": "00:50",
+        "emotion": "sad",
+        "pct": 77.31
+      },
+      {
+        "time": "01:00",
+        "emotion": "neutral",
+        "pct": 45.51
+      },
+      {
+        "time": "01:10",
+        "emotion": "happy",
+        "pct": 68.41
+      },
+      {
+        "time": "01:20",
+        "emotion": "neutral",
+        "pct": 93.77
+      },
+      {
+        "time": "01:30",
+        "emotion": "happy",
+        "pct": 67.25
+      },
+      {
+        "time": "01:40",
+        "emotion": "happy",
+        "pct": 95.6
+      },
+      {
+        "time": "01:50",
+        "emotion": "happy",
+        "pct": 87.45
+      },
+      {
+        "time": "02:00",
+        "emotion": "happy",
+        "pct": 59.4
+      },
+      {
+        "time": "02:10",
+        "emotion": "happy",
+        "pct": 61.43
+      },
+      {
+        "time": "02:20",
+        "emotion": "neutral",
+        "pct": 88.34
+      },
+      {
+        "time": "02:30",
+        "emotion": "neutral",
+        "pct": 53.53
+      },
+      {
+        "time": "02:40",
+        "emotion": "neutral",
+        "pct": 72.61
+      },
+      {
+        "time": "02:50",
+        "emotion": "happy",
+        "pct": 84.82
+      },
+      {
+        "time": "03:00",
+        "emotion": "happy",
+        "pct": 76.22
+      },
+      {
+        "time": "03:10",
+        "emotion": "sad",
+        "pct": 68.99
+      },
+      {
+        "time": "03:20",
+        "emotion": "neutral",
+        "pct": 78.31
+      },
+      {
+        "time": "03:30",
+        "emotion": "neutral",
+        "pct": 65.17
+      },
+      {
+        "time": "03:40",
+        "emotion": "happy",
+        "pct": 57.01
+      },
+      {
+        "time": "03:50",
+        "emotion": "happy",
+        "pct": 69.5
+      },
+      {
+        "time": "04:00",
+        "emotion": "happy",
+        "pct": 49.87
+      }
+    ],
+    "dialogue": [
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Добрый день, компания «Эйкос Жандос».",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Жандос, добрый день.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да, слушаю вас.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Меня шины интересуют зимние, Cordiant вот этот, э-э, Winter Drive.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Размер?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "205/65/15.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Город какой?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Алматы.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Четыре штуки?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Четыре. Это зимние они, да?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да, зимние, без шипов.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да. А что вот это вот означает 94 T?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Индекс скорости, индекс нагрузки. Он стандартный в этом размере на всех шинах.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ага. Ещё такой вопрос: вот у меня сейчас стоят 195/65/15, если я сейчас вот 205 поставлю, ничего страшного не будет?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Какая машина?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Mercedes.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Главное, чтобы арки не задевало при поворотах, а так ничего страшного.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ну, у меня раньше 205 стояли просто, ну. Ничего... ну, я думаю, не будет. Так, э-э, и что скажете, есть по наличию?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "В Алмате... Последний комплект на Щепеткова, дом 117.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "А как-то позвонить вот и забронировать их можно будет?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Я вот как раз хотел вам это и сказать. Давайте забронирую. Потому что последние четыре штуки. Так, 205/65 R15 Cordiant Winter Drive, 4 штуки в Алмате. Подскажите ваше имя, фамилию?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Так, Шарипов Давран.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Шарипов Давран. Д-А-В, да, потом?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да. Давран.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Шарипов Давран. Давран, вы примерно когда планируете проехать?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да я вообще хотел... Вы же там до шести же у них же, да, рабочий день?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да. Можете... А, завтра они тоже работают, кстати. Можете...",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ну, я вот завтра хотел с утра приехать.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Без проблем. Тогда в филиал проедете на Щепеткова, дом 117. Вы адрес запишете или запомните?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Так, Щепеткова, 117... 117?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да. 117.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Всё.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "В филиал проедете, скажете: «интернет-заказ, резерв на ваше имя».",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Интернет-заказ...",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да, резерв на ваше имя.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Да. А подождите, а... да, а теперь я это не смогу через Kaspi всё приобрести, да, или надо там за нал строго теперь?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Нет, смотрите: вы скажете «интернет-заказ, резерв на ваше имя», потом как только вам уже шины вынесут, вы можете через QR-код оформить на Kaspi.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Нет, а я бы хотел как-то в рассрочку получить через Kaspi.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Так через QR-код можно же в рассрочку взять.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Можно, да? В чём проблема... А, ну да.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Да, конечно.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Всё тогда, понял. Всё, они, значит, забронированы, и их не не продадут? Я правильно понимаю?",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Не продадут. Чем быстрее я им сейчас напишу, тем быстрее их поставят на бронь.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Всё, давайте. Сделайте, пожалуйста. Спасибо.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Менеджер",
+        "role": "manager",
+        "text": "Всё, всего доброго, до свидания.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Клиент",
+        "role": "client",
+        "text": "Ага.",
+        "sentiment": "neutral"
+      }
+    ],
+    "checklist": [
+      {
+        "title": "Приветствие и имя компании",
+        "desc": "Представился: «Компания Эйкос, Жандос»",
+        "passed": true
+      },
+      {
+        "title": "Выявление потребности и размера",
+        "desc": "Уточнил параметры: 205/65/15",
+        "passed": true
+      },
+      {
+        "title": "Уточнение города и наличия",
+        "desc": "Филиал: город Алматы",
+        "passed": true
+      },
+      {
+        "title": "Допродажа сопутствующих услуг",
+        "desc": "Не предложено сезонное хранение шин",
+        "passed": false
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "uniqueId": "1607488607.77991",
+    "phone": "87479049469",
+    "direction": "out",
+    "directionLabel": "Исходящий звонок",
+    "date": "09.12.2020",
+    "time": "10:36:47",
+    "duration": "04:31",
+    "durationSec": 271.86,
+    "manager": "Руслан",
+    "topic": "Шины R15-R16 205/65 R15",
+    "city": "Алматы",
+    "productCat": "Зимние шины",
+    "tireSize": "205/65 R15",
+    "brand": "Шины R15-R16",
+    "orderSum": "87 000 ₸",
+    "outcome": "Консультация проведена",
+    "emotion": "Радость",
+    "emotionPct": "92.5%",
+    "emotionClass": "happy",
+    "csat": 4,
+    "scriptScore": 75,
+    "status": "Обработан",
+    "statusClass": "badge-success",
+    "managerPoliteness": "5 / 5",
+    "conflict": false,
+    "summary": "Разговор начался с уточнения клиентом предыдущих попыток найти нужные шины. Менеджер активно и вежливо подобрал подходящие варианты, и диалог завершился на позитивной ноте с договоренностью о проверке и отправке изображений.",
+    "opportunity": "Предложить сезонное хранение шин и расширенную гарантию.",
+    "emotionsDist": {
+      "happy": 92.53,
+      "neutral": 6.17,
+      "sad": 0.84,
+      "angry": 0.46
+    },
+    "acoustics": {
+      "rms": "0.0259",
+      "silence": "103.0 сек (37.9%)",
+      "loudMoments": "13.5%",
+      "tempo": "133.9 уд/мин"
+    },
+    "timeline": [
+      {
+        "time": "00:00",
+        "emotion": "happy",
+        "pct": 98.14
+      },
+      {
+        "time": "00:10",
+        "emotion": "happy",
+        "pct": 99.67
+      },
+      {
+        "time": "00:20",
+        "emotion": "happy",
+        "pct": 94.45
+      },
+      {
+        "time": "00:30",
+        "emotion": "happy",
+        "pct": 99.19
+      },
+      {
+        "time": "00:40",
+        "emotion": "happy",
+        "pct": 99.62
+      },
+      {
+        "time": "00:50",
+        "emotion": "happy",
+        "pct": 94.91
+      },
+      {
+        "time": "01:00",
+        "emotion": "happy",
+        "pct": 99.89
+      },
+      {
+        "time": "01:10",
+        "emotion": "happy",
+        "pct": 99.95
+      },
+      {
+        "time": "01:20",
+        "emotion": "happy",
+        "pct": 97.25
+      },
+      {
+        "time": "01:30",
+        "emotion": "happy",
+        "pct": 99.74
+      },
+      {
+        "time": "01:40",
+        "emotion": "happy",
+        "pct": 99.62
+      },
+      {
+        "time": "01:50",
+        "emotion": "happy",
+        "pct": 99.5
+      },
+      {
+        "time": "02:00",
+        "emotion": "happy",
+        "pct": 95.48
+      },
+      {
+        "time": "02:10",
+        "emotion": "happy",
+        "pct": 95.96
+      },
+      {
+        "time": "02:20",
+        "emotion": "happy",
+        "pct": 97.18
+      },
+      {
+        "time": "02:30",
+        "emotion": "happy",
+        "pct": 99.86
+      },
+      {
+        "time": "02:40",
+        "emotion": "happy",
+        "pct": 77.98
+      },
+      {
+        "time": "02:50",
+        "emotion": "happy",
+        "pct": 93.57
+      },
+      {
+        "time": "03:00",
+        "emotion": "happy",
+        "pct": 98.34
+      },
+      {
+        "time": "03:10",
+        "emotion": "happy",
+        "pct": 94.26
+      },
+      {
+        "time": "03:20",
+        "emotion": "happy",
+        "pct": 96.33
+      },
+      {
+        "time": "03:30",
+        "emotion": "happy",
+        "pct": 96.79
+      },
+      {
+        "time": "03:40",
+        "emotion": "happy",
+        "pct": 89.78
+      },
+      {
+        "time": "03:50",
+        "emotion": "happy",
+        "pct": 96.29
+      },
+      {
+        "time": "04:00",
+        "emotion": "happy",
+        "pct": 91.43
+      },
+      {
+        "time": "04:10",
+        "emotion": "happy",
+        "pct": 87.65
+      },
+      {
+        "time": "04:20",
+        "emotion": "happy",
+        "pct": 95.48
+      },
+      {
+        "time": "04:30",
+        "emotion": "neutral",
+        "pct": 93.19
+      }
+    ],
+    "dialogue": [
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "ЗВОНОК ТЕЛЕФОННЫЙ ЗВОНОК ЗВОНОК ТЕЛЕФОННЫЙ ЗВОНОК ЗВОНОК ТЕЛЕФОННЫЙ ЗВОНОК ЗВОНОК ТЕЛЕФОННЫЙ ЗВОНОК Алло.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Алло.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Алло, здравствуйте.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Здравствуйте.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Не Русан, зовут с компанией Казвоню.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Вы нам присвали по поводу шин на этот заявку в 10.00-20.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Еще до сих пор актуально?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "У меня в тот день звонили уже ваш сотрудник.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Ай, старались?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "В кладе нет у которых по-я пока еще.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "В чемкенке можно заказать когда-ли?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да, а в чемкене не подходит?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Ну, это талдовато там.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "И цены другие.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "А вы в Магрузке 149 нужно было?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "149.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Именно, чтобы с камера слипером было до комплекта.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Ну, там завелись месяц, а цены можно и по отдельности покупать.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Именно в Казвоню надо, да?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Давай, я сейчас все посмотрю.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "8 надо, да?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "В этом размере в Казварде есть комплектом полностью.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Сайлунки Тайска в производство по 1007000.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Нет, не арокитки.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Желательно, погибшись.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Так, давай сейчас еще посмотрим.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "146 индекс не пойдет, да?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "А по какой цене?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "146.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Просея.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Я сейчас посмотрю просто в Казвоню в Ардене.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Омска маили-порур.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Так?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Какие там фирмы?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Омска маили...",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Тайрк с Тайрк с ВМ-21.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Омски жены зовут?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Нет, по-такой цене, это слишком золотенье.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Я в Па-60 два нашелась.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да, но и дали.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Па-62 нашли?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Так.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Что могу Альтернать его предложить?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Это вы нашли тоже в комплекте с камера с либером?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Новая тоже резина, да?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да, нижний Камский.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "144-143.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "144-143.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Омски жены зовут?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "146 тоже индекс будет нагрузки?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "По-такой цене?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Па-5950.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Все, входят.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да, в Куаде-Вит.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "В Казларде имеется 8 штук.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "16 слойная, 146 индекс нагрузки.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "2020.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "OE-73B версия.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Комплет камера флипер Омски жены зовут.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Универсальная колеса.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "OE-177.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "OE-73B.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "OE-73B.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Хорошо, хорошо, понятно.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "5950.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Хорошо, я так как к вашему сотрудникам обращусь.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Будете забирать эти жены?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Давайте резерв поставлю на ваш имя.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Нет, я.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Посмотрите, там сам куда съезжу.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Посмотрю на эти покрышки.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Не просто стараться.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Стратика термогом.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Ромбиком.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Ага.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Так.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "У вас есть в отца?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Я могу об этом заброжение скинуть?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да-да-да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "На яму миллиметри.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Да-да.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Так, секундочку.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "8747.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "904.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "904.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Ага.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Вас как зовут?",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Наршутар.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Все очень приятно.",
+        "sentiment": "positive"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Наршутар, давайте, я вам сейчас изображение скину.",
+        "sentiment": "negative"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Ага, буду жить.",
+        "sentiment": "neutral"
+      },
+      {
+        "speaker": "Неизвестно",
+        "role": "client",
+        "text": "Ага, отлично.",
+        "sentiment": "positive"
+      }
+    ],
+    "checklist": [
+      {
+        "title": "Приветствие и имя компании",
+        "desc": "Представился: «Компания Эйкос, Руслан»",
+        "passed": true
+      },
+      {
+        "title": "Выявление потребности и размера",
+        "desc": "Уточнил параметры: 205/65 R15",
+        "passed": true
+      },
+      {
+        "title": "Уточнение города и наличия",
+        "desc": "Филиал: город Алматы",
+        "passed": true
+      },
+      {
+        "title": "Допродажа сопутствующих услуг",
+        "desc": "Не предложено сезонное хранение шин",
+        "passed": false
+      }
+    ]
+  }
+]

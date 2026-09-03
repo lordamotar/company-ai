@@ -17,3 +17,6 @@ incoming/
 processed/
 .env
 test/
+__pycache__/
+*.pyc
+*.pyo   

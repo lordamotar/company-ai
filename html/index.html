@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIKOS Intelligence CRM — Аналитика звонков и контроль качества</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Боковая панель (Sidebar) -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-logo">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="22"></line>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-name">AIKOS AI</span>
+                    <span class="brand-tag">Speech Analytics</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#calls" class="nav-item active" data-view="view-calls">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    <span>Журнал звонков</span>
+                    <span class="badge-count" id="totalCallsBadge">0</span>
+                </a>
+                <a href="#dashboard" class="nav-item" data-view="view-dashboard">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    <span>Дашборд качества</span>
+                </a>
+                <a href="#managers" class="nav-item" data-view="view-managers">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    <span>Менеджеры</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="avatar">РО</div>
+                    <div class="user-info">
+                        <span class="user-name">Руководитель отдела</span>
+                        <span class="user-role">Контроль качества</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Основная рабочая область (Main Content) -->
+        <main class="main-content">
+            <!-- Верхняя панель (Header) -->
+            <header class="top-header">
+                <div class="header-title">
+                    <h1 id="pageMainHeading">Контроль качества и аналитика речи</h1>
+                    <p class="subtitle" id="pageMainSubheading">Автоматическая расшифровка, оценка скрипта и Tone of Voice на базе AI</p>
+                </div>
+                <div class="header-actions">
+                    <div class="status-indicator live">
+                        <span class="dot"></span> AI Pipeline Active
+                    </div>
+                    <button class="btn btn-secondary" id="refreshBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        Обновить
+                    </button>
+                    <button class="btn btn-primary" id="exportBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Экспорт в Bitrix24
+                    </button>
+                </div>
+            </header>
+
+            <!-- Сводные KPI карточки (общие для CRM) -->
+            <section class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <span class="kpi-label">Всего звонков</span>
+                        <span class="kpi-icon blue">📞</span>
+                    </div>
+                    <div class="kpi-value" id="kpiTotalCalls">0</div>
+                    <div class="kpi-trend positive">↑ 100% обработано ИИ</div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <span class="kpi-label">Средний CSAT (Удовлетворенность)</span>
+                        <span class="kpi-icon green">⭐</span>
+                    </div>
+                    <div class="kpi-value" id="kpiAvgScore">0.0 <span class="max-val">/ 5.0</span></div>
+                    <div class="kpi-trend positive" id="kpiCsatTrend">На основе оценок Gemini AI</div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <span class="kpi-label">Соблюдение скрипта</span>
+                        <span class="kpi-icon purple">📋</span>
+                    </div>
+                    <div class="kpi-value" id="kpiScriptScore">0%</div>
+                    <div class="kpi-trend positive">Стандарт обслуживания</div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <span class="kpi-label">Позитивный Tone of Voice</span>
+                        <span class="kpi-icon yellow">😊</span>
+                    </div>
+                    <div class="kpi-value" id="kpiPositiveTone">0%</div>
+                    <div class="kpi-trend neutral" id="kpiConflictsCount">0 конфликтов зафиксировано</div>
+                </div>
+
+                <div class="kpi-card highlight">
+                    <div class="kpi-header">
+                        <span class="kpi-label">Упущенные допродажи</span>
+                        <span class="kpi-icon red">💡</span>
+                    </div>
+                    <div class="kpi-value" id="kpiLostSales">0 ₸</div>
+                    <div class="kpi-trend warning">Не предложено хранение/монтаж</div>
+                </div>
+            </section>
+
+            <!-- ЭКРАН 1: ЖУРНАЛ ЗВОНКОВ (Таблица) -->
+            <div id="view-calls" class="page-view active">
+                <section class="table-controls">
+                    <div class="search-box">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="searchInput" placeholder="Поиск по номеру, товару, городу или менеджеру...">
+                    </div>
+
+                    <div class="filter-group">
+                        <select id="emotionFilter" class="filter-select">
+                            <option value="all">Все эмоции (Tone of Voice)</option>
+                            <option value="happy">Радость / Дружелюбно</option>
+                            <option value="neutral">Нейтрально</option>
+                            <option value="sad">Грусть / Сомнения</option>
+                        </select>
+
+                        <select id="scoreFilter" class="filter-select">
+                            <option value="all">Любая оценка</option>
+                            <option value="5">⭐⭐⭐⭐⭐ (5 из 5)</option>
+                            <option value="4">⭐⭐⭐⭐ (4 из 5)</option>
+                            <option value="3">⭐⭐⭐ (3 из 5)</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="table-container">
+                    <table class="crm-table" id="callsTable">
+                        <thead>
+                            <tr>
+                                <th>ID & Время</th>
+                                <th>Клиент</th>
+                                <th>Менеджер</th>
+                                <th>Тема / Товары</th>
+                                <th>Длительность</th>
+                                <th>Тон голоса (Wav2Vec2)</th>
+                                <th>CSAT AI</th>
+                                <th>Скрипт</th>
+                                <th>Статус</th>
+                                <th class="text-right">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="callsTableBody">
+                            <!-- Строки звонков генерируются в app.js -->
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+
+            <!-- ЭКРАН 2: ДАШБОРД КАЧЕСТВА -->
+            <div id="view-dashboard" class="page-view">
+                <div class="dashboard-grid">
+                    <!-- Анализ соблюдения скрипта продаж -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <span class="dash-card-title">
+                                📋 Соблюдение этапов скрипта продаж
+                            </span>
+                            <span class="badge badge-primary" id="dashAvgScriptBadge">85% среднее</span>
+                        </div>
+                        <div class="script-bars-list" id="dashScriptBarsList">
+                            <!-- Заполняется динамически из БД -->
+                        </div>
+                    </div>
+
+                    <!-- Тональность голоса и эмоциональный фон -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <span class="dash-card-title">
+                                🎙️ Сводный Tone of Voice (Wav2Vec2)
+                            </span>
+                            <span class="badge badge-success" id="dashEmotionDominantBadge">Дружелюбный фон</span>
+                        </div>
+                        <div class="script-bars-list" id="dashToneBarsList">
+                            <!-- Заполняется динамически из БД -->
+                        </div>
+                    </div>
+
+                    <!-- Распределение по филиалам и городам -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <span class="dash-card-title">
+                                📍 География звонков и филиалы
+                            </span>
+                            <span class="badge badge-outline" id="dashCitiesCountBadge">Казахстан</span>
+                        </div>
+                        <div class="city-bars-list" id="dashCityBarsList">
+                            <!-- Заполняется динамически из БД -->
+                        </div>
+                    </div>
+
+                    <!-- AI Рекомендации и точки роста -->
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <span class="dash-card-title">
+                                💡 Точки роста и упущенная выгода
+                            </span>
+                        </div>
+                        <div class="growth-tips-box" id="dashGrowthTipsBox">
+                            <div class="growth-icon">🎯</div>
+                            <div class="growth-text">
+                                <h4 id="dashGrowthTitle">Основная зона роста: Допродажи сопутствующих услуг</h4>
+                                <p id="dashGrowthDesc">
+                                    В 50% звонков менеджеры качественно консультируют по наличию шин, но упускают предложение услуг сезонного хранения и шиномонтажа. Это создает потенциал роста среднего чека на 18 000 ₸ с каждой заявки.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ЭКРАН 3: МЕНЕДЖЕРЫ -->
+            <div id="view-managers" class="page-view">
+                <div class="managers-grid" id="managersCardsGrid">
+                    <!-- Карточки менеджеров генерируются динамически из базы -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО РАЗБОРА ЗВОНКА (CALL DETAIL MODAL) -->
+        </main>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО РАЗБОРА ЗВОНКА (CALL DETAIL MODAL) -->
+    <div class="modal-backdrop" id="callModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-badge-row">
+                        <span class="badge badge-primary" id="modalCallDirection">Входящий звонок</span>
+                        <span class="badge badge-outline" id="modalCallId">#13</span>
+                        <span class="badge badge-success" id="modalCallDate">13.11.2020 15:05:53</span>
+                    </div>
+                    <h2 class="modal-title" id="modalPhoneTitle">+7 (701) 466-29-90</h2>
+                </div>
+                <button class="modal-close-btn" id="closeModalBtn">&times;</button>
+            </div>
+
+            <!-- Вкладки модального окна -->
+            <div class="modal-tabs">
+                <button class="tab-btn active" data-tab="tab-summary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                    Резюме и Допродажи
+                </button>
+                <button class="tab-btn" data-tab="tab-transcript">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    Транскрипция (Диалог)
+                </button>
+                <button class="tab-btn" data-tab="tab-tone">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path></svg>
+                    Тон-Войс & Акустика
+                </button>
+                <button class="tab-btn" data-tab="tab-checklist">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    Чек-лист Скрипта
+                </button>
+            </div>
+
+            <!-- Тело модального окна -->
+            <div class="modal-body">
+                <!-- ВКЛАДКА 1: РЕЗЮМЕ И ДОПРОДАЖИ -->
+                <div class="tab-content active" id="tab-summary">
+                    <div class="summary-grid">
+                        <div class="card summary-main-card">
+                            <h3>🤖 Аналитическое резюме звонка (AI)</h3>
+                            <p class="summary-text" id="modalSummaryText"></p>
+                            
+                            <div class="key-facts-grid">
+                                <div class="fact-item">
+                                    <span class="fact-label">Город</span>
+                                    <span class="fact-val" id="modalCity">Шымкент</span>
+                                </div>
+                                <div class="fact-item">
+                                    <span class="fact-label">Категория товара</span>
+                                    <span class="fact-val" id="modalProductCat">Зимние шины (Липучка)</span>
+                                </div>
+                                <div class="fact-item">
+                                    <span class="fact-label">Размерность</span>
+                                    <span class="fact-val" id="modalTireSize">205/55 R16</span>
+                                </div>
+                                <div class="fact-item">
+                                    <span class="fact-label">Выбранный бренд</span>
+                                    <span class="fact-val" id="modalSelectedBrand">Kormoran (Michelin group)</span>
+                                </div>
+                                <div class="fact-item">
+                                    <span class="fact-label">Сумма заказа</span>
+                                    <span class="fact-val highlight" id="modalOrderSum">87 000 ₸ (4 шт)</span>
+                                </div>
+                                <div class="fact-item">
+                                    <span class="fact-label">Итог звонка</span>
+                                    <span class="fact-val success" id="modalOutcome">Бронь на Темирязева 53А</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Оценки и метрики качества -->
+                        <div class="card score-card">
+                            <h3>⭐ Оценки обслуживания</h3>
+                            <div class="score-row">
+                                <span>Удовлетворенность клиента (CSAT):</span>
+                                <span class="stars" id="modalCsatStars">⭐⭐⭐⭐⭐ 5/5</span>
+                            </div>
+                            <div class="score-row">
+                                <span>Вежливость менеджера:</span>
+                                <span class="badge badge-success" id="modalManagerPoliteness">5 / 5 (Отлично)</span>
+                            </div>
+                            <div class="score-row">
+                                <span>Конфликт / Недовольство:</span>
+                                <span class="badge badge-neutral" id="modalConflictStatus">Не зафиксирован</span>
+                            </div>
+                            <div class="score-row">
+                                <span>Соблюдение регламента:</span>
+                                <span class="badge badge-primary" id="modalScriptPct">88%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Карточка упущенной выгоды -->
+                    <div class="card opportunity-card">
+                        <div class="opp-icon">💡</div>
+                        <div class="opp-content">
+                            <h4>Обнаружен потенциал допродажи (Sales Opportunity)</h4>
+                            <p id="modalOpportunityText">Клиент приобрел 4 зимние шины. Менеджер предложил скидку 20% на шиномонтаж, однако <strong>не предложил услугу сезонного хранения шин</strong>. Вероятность согласия оценивалась в 76% (~15 000 ₸).</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ВКЛАДКА 2: ТРАНСКРИПЦИЯ (ДИАЛОГ) -->
+                <div class="tab-content" id="tab-transcript">
+                    <div class="transcript-player-bar">
+                        <button class="player-btn" id="playAudioBtn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            Прослушать аудио
+                        </button>
+                        <div class="audio-progress">
+                            <span class="time-curr">00:00</span>
+                            <div class="progress-bar-track">
+                                <div class="progress-fill" style="width: 35%;"></div>
+                            </div>
+                            <span class="time-total" id="modalAudioDuration">04:03</span>
+                        </div>
+                        <div class="transcript-legend">
+                            <span class="legend-dot green"></span> Позитив
+                            <span class="legend-dot grey"></span> Нейтрально
+                            <span class="legend-dot red"></span> Негатив
+                        </div>
+                    </div>
+
+                    <div class="dialogue-container" id="modalDialogueContainer">
+                        <!-- Реплики диалога со значками тональности RuBERT -->
+                    </div>
+                </div>
+
+                <!-- ВКЛАДКА 3: ТОН-ВОЙС & АКУСТИКА -->
+                <div class="tab-content" id="tab-tone">
+                    <div class="tone-analytics-grid">
+                        <!-- Эмоции Wav2Vec2 -->
+                        <div class="card tone-card">
+                            <h3>🎙️ Эмоции по голосу (Wav2Vec2 SER)</h3>
+                            <p class="tone-subtitle">Анализ интонаций, тембра и дрожания голоса</p>
+
+                            <div class="emotion-bars" id="modalEmotionBars">
+                                <!-- Полосы эмоций -->
+                            </div>
+                        </div>
+
+                        <!-- Акустические характеристики -->
+                        <div class="card acoustic-card">
+                            <h3>📊 Физические свойства звука (Акустика)</h3>
+                            <div class="acoustic-metric">
+                                <span class="metric-title">Время тишины и пауз:</span>
+                                <span class="metric-val" id="modalSilenceMetric">57.4 сек (23.6%)</span>
+                                <div class="metric-bar"><div class="fill" style="width: 23.6%;"></div></div>
+                            </div>
+
+                            <div class="acoustic-metric">
+                                <span class="metric-title">Резкие всплески / Крики:</span>
+                                <span class="metric-val" id="modalLoudMetric">0% (В норме)</span>
+                                <div class="metric-bar"><div class="fill green" style="width: 5%;"></div></div>
+                            </div>
+
+                            <div class="acoustic-metric">
+                                <span class="metric-title">Темп речи менеджера:</span>
+                                <span class="metric-val" id="modalTempoMetric">133.9 уд/мин (Оптимальный)</span>
+                                <div class="metric-bar"><div class="fill purple" style="width: 65%;"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Посегментный таймлайн -->
+                    <div class="card timeline-card">
+                        <h3>⏱️ Посегментный таймлайн эмоций (10-секундные интервалы)</h3>
+                        <p class="timeline-subtitle">Нажмите на интервал для перехода к моменту звонка</p>
+                        
+                        <div class="timeline-track" id="modalTimelineTrack">
+                            <!-- Сегменты генерируются в JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ВКЛАДКА 4: ЧЕК-ЛИСТ СКРИПТА -->
+                <div class="tab-content" id="tab-checklist">
+                    <div class="checklist-container">
+                        <h3>📋 Проверка чек-листа звонка менеджера</h3>
+                        <div class="checklist-items" id="modalChecklistItems">
+                            <!-- Чек-лист генерируется в JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="closeModalFooterBtn">Закрыть</button>
+                <button class="btn btn-primary" id="saveCrmBtn">Синхронизировать с сделкой #45291</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
