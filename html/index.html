@@ -46,6 +46,11 @@
                     <span>Клиенты</span>
                     <span class="badge-count" id="totalClientsBadge">0</span>
                 </a>
+                <a href="#audit" class="nav-item" data-view="view-audit">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <span>Журнал изменений</span>
+                    <span class="badge-count" id="totalAuditBadge">0</span>
+                </a>
             </nav>
 
             <div class="sidebar-footer">
@@ -113,13 +118,13 @@
                         <div class="kpi-trend positive">Стандарт обслуживания</div>
                     </div>
 
-                    <div class="kpi-card">
+                    <div class="kpi-card interactive-kpi" id="kpiToneCard" title="Нажмите, чтобы отфильтровать звонки с конфликтами и претензиями">
                         <div class="kpi-header">
                             <span class="kpi-label">Позитивный Tone of Voice</span>
                             <span class="kpi-icon yellow">😊</span>
                         </div>
                         <div class="kpi-value" id="kpiPositiveTone">0%</div>
-                        <div class="kpi-trend neutral" id="kpiConflictsCount">0 конфликтов зафиксировано</div>
+                        <div class="kpi-trend warning clickable-trend" id="kpiConflictsCount" style="cursor: pointer;">0 конфликтов зафиксировано</div>
                     </div>
 
                     <div class="kpi-card highlight">
@@ -143,6 +148,7 @@
                             <option value="happy">Радость / Дружелюбно</option>
                             <option value="neutral">Нейтрально</option>
                             <option value="sad">Грусть / Сомнения</option>
+                            <option value="conflict">⚠️ Конфликты и претензии</option>
                         </select>
 
                         <select id="scoreFilter" class="filter-select">
@@ -150,9 +156,20 @@
                             <option value="5">⭐⭐⭐⭐⭐ (5 из 5)</option>
                             <option value="4">⭐⭐⭐⭐ (4 из 5)</option>
                             <option value="3">⭐⭐⭐ (3 из 5)</option>
+                            <option value="2">⭐⭐ (Низкая оценка ≤ 2)</option>
                         </select>
                     </div>
                 </section>
+
+                <!-- Индикатор активного фильтра конфликтов -->
+                <div id="activeFilterBadgeBar" style="display: none; margin-bottom: 14px; align-items: center; gap: 10px;">
+                    <span class="badge badge-warning" id="activeFilterText" style="padding: 6px 12px; font-size: 12.5px; border-radius: 8px;">
+                        ⚠️ Фильтр: показаны звонки с конфликтами и претензиями
+                    </span>
+                    <button class="btn-action" id="resetConflictFilterBtn" style="padding: 5px 12px; font-size: 12px; border-radius: 6px; cursor: pointer; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">
+                        ✕ Сбросить фильтр (показать все)
+                    </button>
+                </div>
 
                 <section class="table-container">
                     <table class="crm-table" id="callsTable">
@@ -332,6 +349,82 @@
                     </table>
                 </div>
             </div>
+
+            <!-- ЭКРАН 5: ЖУРНАЛ ИЗМЕНЕНИЙ И АУДИТА ДАННЫХ -->
+            <div id="view-audit" class="page-view">
+                <!-- Сводная панель аудита -->
+                <section class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Всего корректировок</span>
+                            <span class="kpi-icon blue">📝</span>
+                        </div>
+                        <div class="kpi-value" id="kpiAuditTotal">0</div>
+                        <div class="kpi-trend positive">Ручные правки данных</div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Исправлено менеджеров</span>
+                            <span class="kpi-icon purple">👨‍💼</span>
+                        </div>
+                        <div class="kpi-value" id="kpiAuditManagers">0</div>
+                        <div class="kpi-trend positive">Уточнено по голосу / РОП</div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Скорректировано городов</span>
+                            <span class="kpi-icon yellow">📍</span>
+                        </div>
+                        <div class="kpi-value" id="kpiAuditCities">0</div>
+                        <div class="kpi-trend neutral">Филиалы обслуживания</div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-label">Последняя правка</span>
+                            <span class="kpi-icon green">⏱️</span>
+                        </div>
+                        <div class="kpi-value" id="kpiAuditLastTime" style="font-size: 15px; margin-top: 5px;">—</div>
+                        <div class="kpi-trend positive" id="kpiAuditLastUser">История версий активна</div>
+                    </div>
+                </section>
+
+                <section class="table-controls">
+                    <div class="search-box" style="flex: 1.5; max-width: 500px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="auditSearchInput" placeholder="Поиск по ID звонка, менеджеру, полю или автору правки...">
+                    </div>
+
+                    <div class="filter-group">
+                        <select id="auditFieldFilter" class="filter-select">
+                            <option value="all">Все поля</option>
+                            <option value="manager_name">Менеджер</option>
+                            <option value="city_name">Город / Филиал</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="table-container">
+                    <table class="crm-table">
+                        <thead>
+                            <tr>
+                                <th>Дата и время правки</th>
+                                <th>Звонок (#ID & Телефон)</th>
+                                <th>Измененное поле</th>
+                                <th>Было ➔ Стало</th>
+                                <th>Кем изменено</th>
+                                <th>Причина / Комментарий</th>
+                                <th class="text-right">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auditTableBody">
+                            <!-- Заполняется в JS -->
+                        </tbody>
+                    </table>
+                </section>
+            </div>
         </main>
     </div>
 
@@ -347,7 +440,12 @@
                     </div>
                     <h2 class="modal-title" id="modalPhoneTitle">+7 (701) 466-29-90</h2>
                 </div>
-                <button class="modal-close-btn" id="closeModalBtn">&times;</button>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="btn btn-secondary" id="openEditFromModalBtn" style="padding: 6px 12px; font-size: 12px; border-radius: 8px;">
+                        ✏️ Редактировать (Менеджер / Город)
+                    </button>
+                    <button class="modal-close-btn" id="closeModalBtn">&times;</button>
+                </div>
             </div>
 
             <!-- Вкладки модального окна -->
@@ -443,15 +541,17 @@
                 <div class="tab-content" id="tab-transcript">
                     <div class="transcript-player-bar">
                         <button class="player-btn" id="playAudioBtn">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                            Прослушать аудио
+                            <span id="playerBtnIcon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            </span>
+                            <span id="playerBtnText">Прослушать аудио</span>
                         </button>
-                        <div class="audio-progress">
-                            <span class="time-curr">00:00</span>
-                            <div class="progress-bar-track">
-                                <div class="progress-fill" style="width: 35%;"></div>
+                        <div class="audio-progress" style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                            <span class="time-curr" id="modalAudioCurrentTime">00:00</span>
+                            <div class="progress-bar-track" id="modalAudioTrack" style="flex: 1; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; cursor: pointer; position: relative;" title="Нажмите для перемотки аудио">
+                                <div class="progress-fill" id="modalAudioProgressFill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #38bdf8, #818cf8); border-radius: 4px; pointer-events: none; transition: width 0.1s linear;"></div>
                             </div>
-                            <span class="time-total" id="modalAudioDuration">04:03</span>
+                            <span class="time-total" id="modalAudioDuration">00:00</span>
                         </div>
                         <div class="transcript-legend">
                             <span class="legend-dot green"></span> Позитив
@@ -459,6 +559,8 @@
                             <span class="legend-dot red"></span> Негатив
                         </div>
                     </div>
+
+                    <audio id="globalCallAudioPlayer" preload="none" style="display: none;"></audio>
 
                     <div class="dialogue-container" id="modalDialogueContainer">
                         <!-- Реплики диалога со значками тональности RuBERT -->
@@ -868,6 +970,92 @@
 
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="closeClientModalFooterBtn">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ ДАННЫХ ЗВОНКА (МЕНЕДЖЕР / ГОРОД) -->
+    <div class="modal-backdrop" id="editCallModal" style="z-index: 10050;">
+        <div class="modal-dialog" style="max-width: 520px;">
+            <div class="modal-header">
+                <div>
+                    <h2 class="modal-title" id="editModalTitle">✏️ Корректировка данных звонка</h2>
+                    <p class="modal-subtitle" id="editModalSubtitle">Звонок #9 • Клиент: +7 (747) 904-94-69</p>
+                </div>
+                <button class="modal-close-btn" id="closeEditModalBtn">&times;</button>
+            </div>
+
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+                <input type="hidden" id="editCallId">
+
+                <div class="form-group">
+                    <label style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+                        Менеджер (Сотрудник компании):
+                    </label>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="editManagerSelect" class="filter-select" style="flex: 1;">
+                            <option value="Оператор">Оператор (Не определен)</option>
+                            <option value="Руслан">Руслан</option>
+                            <option value="Жандос">Жандос</option>
+                            <option value="Фарит">Фарит</option>
+                            <option value="Азамат">Азамат</option>
+                            <option value="Данияр">Данияр</option>
+                            <option value="Айбек">Айбек</option>
+                            <option value="Максим">Максим</option>
+                            <option value="Ербол">Ербол</option>
+                            <option value="custom">✏️ Другое имя...</option>
+                        </select>
+                        <input type="text" id="editManagerCustom" placeholder="Введите имя..." style="display: none; flex: 1; background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; color: #fff;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+                        Город / Филиал:
+                    </label>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="editCitySelect" class="filter-select" style="flex: 1;">
+                            <option value="Алматы">Алматы</option>
+                            <option value="Шымкент">Шымкент</option>
+                            <option value="Астана">Астана</option>
+                            <option value="Караганда">Караганда</option>
+                            <option value="Актобе">Актобе</option>
+                            <option value="Тараз">Тараз</option>
+                            <option value="Павлодар">Павлодар</option>
+                            <option value="Усть-Каменогорск">Усть-Каменогорск</option>
+                            <option value="Семей">Семей</option>
+                            <option value="Атырау">Атырау</option>
+                            <option value="custom">✏️ Другой город...</option>
+                        </select>
+                        <input type="text" id="editCityCustom" placeholder="Введите город..." style="display: none; flex: 1; background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; color: #fff;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+                        Кем вносятся изменения (Автор):
+                    </label>
+                    <select id="editAuthorSelect" class="filter-select" style="width: 100%;">
+                        <option value="РОП (Руководитель отдела)">РОП (Руководитель отдела)</option>
+                        <option value="Супервайзер контроля качества">Супервайзер контроля качества</option>
+                        <option value="Старший менеджер">Старший менеджер</option>
+                        <option value="Администратор">Администратор</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+                        Причина корректировки / Комментарий:
+                    </label>
+                    <textarea id="editCommentInput" rows="2" placeholder="Например: Менеджер не назвал имя при приветствии, идентифицирован по тембру голоса..." style="width: 100%; background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; color: #fff; font-size: 13px; outline: none; resize: vertical;"></textarea>
+                </div>
+
+                <div id="editModalAlert" style="display: none; padding: 10px; border-radius: 8px; font-size: 12.5px;"></div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelEditModalBtn">Отмена</button>
+                <button class="btn btn-primary" id="saveEditModalBtn">💾 Сохранить в БД и Журнал</button>
             </div>
         </div>
     </div>

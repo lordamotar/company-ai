@@ -1,5 +1,6 @@
 // Инициализация пустого массива данных (заполняется ИСКЛЮЧИТЕЛЬНО из базы данных)
 let callsData = [];
+let auditLogsData = [];
 
 // Функция динамического пересчета KPI-карточек на основе реальных данных из базы
 function updateKpis(data) {
@@ -86,6 +87,10 @@ function renderCallsTable(data) {
             emotionBadge = `<span class="badge badge-neutral">😐 ${call.emotion || "Нейтрально"} ${call.emotionPct || ""}</span>`;
         }
 
+        if (call.conflict || Number(call.csat) <= 2) {
+            emotionBadge += ` <span class="badge badge-warning" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); font-size: 10px; padding: 2px 6px; margin-left: 4px;" title="${call.conflictReason || 'Зафиксировано недовольство'}">⚠️ Претензия</span>`;
+        }
+
         const isOut = (call.direction === "out");
         const dirBadge = isOut 
             ? `<span class="badge badge-primary" style="font-size: 10px; padding: 2px 6px;">↗ Исх</span>` 
@@ -103,18 +108,30 @@ function renderCallsTable(data) {
             </td>
             <td><span class="phone-badge">${call.phone || "Клиент"}</span></td>
             <td>
-                <div class="manager-badge">
+                <div class="manager-badge" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" onclick="event.stopPropagation(); openEditCallModal(${call.id});" title="Нажмите, чтобы изменить имя менеджера или город">
                     <span class="manager-avatar-sm">${managerInitial}</span>
                     <span>${managerName}</span>
+                    <span style="font-size: 11px; opacity: 0.7;" title="Редактировать">✏️</span>
                 </div>
             </td>
             <td><strong>${call.topic || "Консультация"}</strong></td>
-            <td>${call.duration || "—"}</td>
+            <td>
+                <div style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding: 3px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2);" onclick="event.stopPropagation(); openCallAndPlayAudio(${call.id});" title="Нажмите, чтобы включить прослушку аудиозаписи">
+                    <span style="color: #38bdf8; font-size: 10px;">▶</span>
+                    <span style="color: #e2e8f0; font-size: 12px; font-family: monospace;">${call.duration || "—"}</span>
+                </div>
+            </td>
             <td>${emotionBadge}</td>
             <td><span class="stars-score">⭐ ${call.csat || 5}.0 / 5</span></td>
             <td><span class="badge badge-primary">${call.scriptScore || 80}%</span></td>
             <td><span class="badge ${call.statusClass || 'badge-success'}">${call.status || 'Обработан'}</span></td>
-            <td class="text-right">
+            <td class="text-right" style="white-space: nowrap;">
+                <button class="btn-icon" style="margin-right: 4px; padding: 5px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; cursor: pointer;" onclick="event.stopPropagation(); openCallAndPlayAudio(${call.id});" title="Включить прослушку аудио">
+                    🎧
+                </button>
+                <button class="btn-icon" style="margin-right: 4px; padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;" onclick="event.stopPropagation(); openEditCallModal(${call.id});" title="Редактировать имя менеджера или город">
+                    ✏️
+                </button>
                 <button class="action-btn" onclick="event.stopPropagation(); openCallModal(${call.id});">
                     Разбор AI
                 </button>
@@ -218,8 +235,8 @@ function renderDashboard(data) {
             <div class="script-bar-meta"><span>🙁 Сомнения / Неуверенность</span><span>${sadAvg}%</span></div>
             <div class="script-bar-track"><div class="script-bar-fill yellow" style="width: ${sadAvg}%;"></div></div>
         </div>
-        <div class="script-bar-item">
-            <div class="script-bar-meta"><span>😠 Раздражение / Конфликт</span><span>${angryAvg}%</span></div>
+        <div class="script-bar-item" style="cursor: pointer;" onclick="filterConflictCalls()" title="Нажмите, чтобы показать звонки с конфликтами">
+            <div class="script-bar-meta"><span style="color: #f87171;">😠 Раздражение / Конфликт (показать звонки ➔)</span><span style="color: #f87171;">${angryAvg}%</span></div>
             <div class="script-bar-track"><div class="script-bar-fill" style="background: #ef4444; width: ${angryAvg}%;"></div></div>
         </div>
     `;
@@ -1083,6 +1100,10 @@ function switchView(viewId) {
     } else if (viewId === "view-clients") {
         if (heading) heading.innerText = "Клиентская база и история обращений";
         if (subheading) subheading.innerText = "История звонков каждого клиента, вопросы, потребности и AI-профилирование";
+    } else if (viewId === "view-audit") {
+        if (heading) heading.innerText = "Журнал изменений и аудит данных";
+        if (subheading) subheading.innerText = "История ручных корректировок имен менеджеров, городов и параметров звонков";
+        renderAuditLogs(auditLogsData);
     }
 }
 
@@ -1096,6 +1117,13 @@ function openCallModal(callId) {
     document.getElementById("modalCallDate").innerText = `${call.date || ''} ${call.time || ''}`;
     document.getElementById("modalCallDirection").innerText = call.directionLabel || (call.direction === "out" ? "Исходящий звонок" : "Входящий звонок");
     document.getElementById("modalPhoneTitle").innerText = `${call.phone || 'Клиент'} (${call.city || 'Казахстан'})`;
+
+    const editModalBtn = document.getElementById("openEditFromModalBtn");
+    if (editModalBtn) {
+        editModalBtn.onclick = () => {
+            openEditCallModal(call.id);
+        };
+    }
 
     // Вкладка 1: Резюме
     document.getElementById("modalSummaryText").innerText = call.summary || "Транскрипция и краткое резюме звонка.";
@@ -1114,14 +1142,23 @@ function openCallModal(callId) {
     document.getElementById("modalScriptPct").innerText = `${call.scriptScore || 85}%`;
 
     // Вкладка 2: Транскрипция (Диалог)
-    document.getElementById("modalAudioDuration").innerText = call.duration || "—";
+    initCallAudio(call, false);
+
     const dialogueContainer = document.getElementById("modalDialogueContainer");
     dialogueContainer.innerHTML = "";
 
     if (Array.isArray(call.dialogue) && call.dialogue.length > 0) {
-        call.dialogue.forEach(msg => {
+        const totalDuration = call.durationSec || 60;
+        const totalLines = call.dialogue.length;
+
+        call.dialogue.forEach((msg, index) => {
             const msgDiv = document.createElement("div");
             msgDiv.className = `message-row ${msg.role || 'manager'}`;
+            msgDiv.style.cursor = "pointer";
+            msgDiv.title = "Нажмите, чтобы включить аудио с этого момента";
+
+            const approxStartSec = (index / totalLines) * totalDuration;
+            const timeTag = formatAudioTime(approxStartSec);
 
             let sentimentLabel = "НЕЙТРАЛЬНО";
             let sentimentClass = "neutral";
@@ -1135,11 +1172,20 @@ function openCallModal(callId) {
 
             msgDiv.innerHTML = `
                 <div class="msg-header">
-                    <span class="msg-speaker">${msg.speaker || 'Собеседник'}</span>
+                    <span class="msg-speaker">${msg.speaker || 'Собеседник'} <span style="font-size: 10.5px; opacity: 0.6; font-weight: 400; margin-left: 6px;">⏱️ ${timeTag}</span></span>
                     <span class="sentiment-tag ${sentimentClass}">${sentimentLabel}</span>
                 </div>
                 <div class="msg-text">${msg.text}</div>
             `;
+
+            msgDiv.onclick = () => {
+                const audio = document.getElementById("globalCallAudioPlayer");
+                if (audio) {
+                    audio.currentTime = approxStartSec;
+                    audio.play().then(() => setPlayerBtnState(true)).catch(() => {});
+                }
+            };
+
             dialogueContainer.appendChild(msgDiv);
         });
     } else {
@@ -1296,8 +1342,123 @@ function openCallModal(callId) {
     }
 }
 
+// Контроллер аудиоплеера
+let currentPlayingCallId = null;
+
+function formatAudioTime(seconds) {
+    if (isNaN(seconds) || seconds < 0) return "00:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+function setPlayerBtnState(isPlaying) {
+    const btnIcon = document.getElementById("playerBtnIcon");
+    const btnText = document.getElementById("playerBtnText");
+    const playBtn = document.getElementById("playAudioBtn");
+
+    if (isPlaying) {
+        if (btnIcon) {
+            btnIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+        }
+        if (btnText) btnText.innerText = "Пауза";
+        if (playBtn) playBtn.classList.add("playing");
+    } else {
+        if (btnIcon) {
+            btnIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+        }
+        if (btnText) btnText.innerText = "Прослушать аудио";
+        if (playBtn) playBtn.classList.remove("playing");
+    }
+}
+
+function initCallAudio(call, autoPlay = false) {
+    const audio = document.getElementById("globalCallAudioPlayer");
+    const playBtn = document.getElementById("playAudioBtn");
+    const currTimeEl = document.getElementById("modalAudioCurrentTime");
+    const durEl = document.getElementById("modalAudioDuration");
+    const progressFill = document.getElementById("modalAudioProgressFill");
+    const track = document.getElementById("modalAudioTrack");
+
+    if (!audio) return;
+
+    audio.pause();
+    currentPlayingCallId = call.id;
+    audio.src = `/api/audio?call_id=${call.id}`;
+    audio.currentTime = 0;
+
+    if (currTimeEl) currTimeEl.innerText = "00:00";
+    if (durEl) durEl.innerText = call.duration || "00:00";
+    if (progressFill) progressFill.style.width = "0%";
+    setPlayerBtnState(false);
+
+    audio.ontimeupdate = () => {
+        if (currTimeEl) currTimeEl.innerText = formatAudioTime(audio.currentTime);
+        if (audio.duration && !isNaN(audio.duration) && audio.duration > 0) {
+            const pct = Math.min((audio.currentTime / audio.duration) * 100, 100);
+            if (progressFill) progressFill.style.width = `${pct}%`;
+            if (durEl && (!call.duration || call.duration === "—")) {
+                durEl.innerText = formatAudioTime(audio.duration);
+            }
+        }
+    };
+
+    audio.onended = () => {
+        setPlayerBtnState(false);
+        if (progressFill) progressFill.style.width = "0%";
+        if (currTimeEl) currTimeEl.innerText = "00:00";
+    };
+
+    audio.onerror = (e) => {
+        console.warn("[AI CRM Audio] Инфо/Ошибка загрузки аудиозаписи:", e);
+        setPlayerBtnState(false);
+    };
+
+    if (playBtn) {
+        playBtn.onclick = () => {
+            if (audio.paused) {
+                audio.play().then(() => {
+                    setPlayerBtnState(true);
+                }).catch(err => {
+                    console.warn("[AI CRM Audio] Ошибка воспроизведения:", err);
+                    setPlayerBtnState(false);
+                });
+            } else {
+                audio.pause();
+                setPlayerBtnState(false);
+            }
+        };
+    }
+
+    if (track) {
+        track.onclick = (e) => {
+            const rect = track.getBoundingClientRect();
+            const clickPos = (e.clientX - rect.left) / rect.width;
+            if (audio.duration && !isNaN(audio.duration)) {
+                audio.currentTime = clickPos * audio.duration;
+            } else if (call.durationSec) {
+                audio.currentTime = clickPos * call.durationSec;
+            }
+        };
+    }
+
+    if (autoPlay) {
+        audio.play().then(() => setPlayerBtnState(true)).catch(() => {});
+    }
+}
+
+function stopCallAudio() {
+    const audio = document.getElementById("globalCallAudioPlayer");
+    if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+    }
+    setPlayerBtnState(false);
+}
+
 // Закрытие модального окна звонка
 function closeCallModal() {
+    stopCallAudio();
     const modal = document.getElementById("callModal");
     if (modal) {
         modal.classList.remove("open");
@@ -1305,12 +1466,317 @@ function closeCallModal() {
     }
 }
 
-// Загрузка реальных данных из базы данных через calls_data.json
+// Рендеринг журнала аудита и изменений
+function renderAuditLogs(data) {
+    const tableBody = document.getElementById("auditTableBody");
+    const totalEl = document.getElementById("kpiAuditTotal");
+    const mgrsEl = document.getElementById("kpiAuditManagers");
+    const citiesEl = document.getElementById("kpiAuditCities");
+    const lastTimeEl = document.getElementById("kpiAuditLastTime");
+    const lastUserEl = document.getElementById("kpiAuditLastUser");
+    const badgeEl = document.getElementById("totalAuditBadge");
+
+    const total = data.length;
+    if (badgeEl) badgeEl.innerText = total;
+    if (totalEl) totalEl.innerText = total;
+
+    const mgrsCount = data.filter(l => l.fieldName === "manager_name").length;
+    const citiesCount = data.filter(l => l.fieldName === "city_name").length;
+
+    if (mgrsEl) mgrsEl.innerText = mgrsCount;
+    if (citiesEl) citiesEl.innerText = citiesCount;
+
+    if (total > 0) {
+        if (lastTimeEl) lastTimeEl.innerText = data[0].changedAt || "—";
+        if (lastUserEl) lastUserEl.innerText = `Автор: ${data[0].changedBy || 'Супервайзер'}`;
+    } else {
+        if (lastTimeEl) lastTimeEl.innerText = "—";
+        if (lastUserEl) lastUserEl.innerText = "История версий активна";
+    }
+
+    if (!tableBody) return;
+    tableBody.innerHTML = "";
+
+    // Фильтрация поиска
+    const searchVal = document.getElementById("auditSearchInput")?.value?.toLowerCase()?.trim() || "";
+    const fieldVal = document.getElementById("auditFieldFilter")?.value || "all";
+
+    const filtered = data.filter(l => {
+        const matchesField = (fieldVal === "all" || l.fieldName === fieldVal);
+        const matchesSearch = !searchVal || 
+            String(l.callId).includes(searchVal) ||
+            (l.phone && l.phone.toLowerCase().includes(searchVal)) ||
+            (l.oldValue && l.oldValue.toLowerCase().includes(searchVal)) ||
+            (l.newValue && l.newValue.toLowerCase().includes(searchVal)) ||
+            (l.changedBy && l.changedBy.toLowerCase().includes(searchVal)) ||
+            (l.comment && l.comment.toLowerCase().includes(searchVal));
+        return matchesField && matchesSearch;
+    });
+
+    if (filtered.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                    <div style="font-size: 32px; margin-bottom: 8px;">📋</div>
+                    <div>Записей в журнале изменений пока нет. Отредактируйте звонок для фиксации аудита.</div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    filtered.forEach(l => {
+        const tr = document.createElement("tr");
+        const isMgr = (l.fieldName === "manager_name");
+        tr.innerHTML = `
+            <td>
+                <span style="color: var(--text-primary); font-weight: 500; font-size: 13px;">${l.changedAt}</span>
+            </td>
+            <td>
+                <div class="call-id-col">
+                    <span class="call-num">#${l.callId}</span>
+                    <span class="call-time">${l.phone || 'Клиент'} (${l.callDate || ''})</span>
+                </div>
+            </td>
+            <td>
+                <span class="badge ${isMgr ? 'badge-primary' : 'badge-warning'}" style="font-size: 11px;">
+                    ${isMgr ? '👨‍💼 Менеджер' : '📍 Город / Филиал'}
+                </span>
+            </td>
+            <td>
+                <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; text-decoration: line-through;">${l.oldValue}</span>
+                <span style="color: var(--text-muted); margin: 0 4px;">➔</span>
+                <span class="badge badge-success" style="font-weight: 700;">${l.newValue}</span>
+            </td>
+            <td>
+                <span class="badge badge-outline" style="border-color: rgba(99, 102, 241, 0.4); color: #818cf8;">👤 ${l.changedBy}</span>
+            </td>
+            <td style="font-size: 12.5px; color: var(--text-secondary); max-width: 250px;">
+                ${l.comment || 'Корректировка данных'}
+            </td>
+            <td class="text-right">
+                <button class="action-btn" onclick="openCallModal(${l.callId});">
+                    Разбор #${l.callId}
+                </button>
+            </td>
+        `;
+        tableBody.appendChild(tr);
+    });
+}
+
+// Открытие модального окна редактирования звонка
+function openEditCallModal(callId) {
+    console.log("[AI CRM] openEditCallModal вызван для звонка ID:", callId);
+    const call = callsData.find(c => c.id == callId);
+    if (!call) {
+        console.warn("[AI CRM] Звонок не найден в callsData:", callId);
+        return;
+    }
+
+    const editCallIdEl = document.getElementById("editCallId");
+    const titleEl = document.getElementById("editModalTitle");
+    const subtitleEl = document.getElementById("editModalSubtitle");
+
+    if (editCallIdEl) editCallIdEl.value = call.id;
+    if (titleEl) titleEl.innerText = `✏️ Корректировка данных звонка #${call.id}`;
+    if (subtitleEl) subtitleEl.innerText = `Клиент: ${call.phone || '—'} • Дата: ${call.date || '—'} ${call.time || ''}`;
+
+    const mgrSelect = document.getElementById("editManagerSelect");
+    const mgrCustom = document.getElementById("editManagerCustom");
+    const currentMgr = call.manager || "Оператор";
+
+    if (mgrSelect) {
+        let mgrOptionExists = false;
+        for (let opt of mgrSelect.options) {
+            if (opt.value === currentMgr) {
+                mgrSelect.value = currentMgr;
+                mgrOptionExists = true;
+                break;
+            }
+        }
+        if (!mgrOptionExists) {
+            mgrSelect.value = "custom";
+            if (mgrCustom) {
+                mgrCustom.style.display = "block";
+                mgrCustom.value = currentMgr;
+            }
+        } else {
+            if (mgrCustom) {
+                mgrCustom.style.display = "none";
+                mgrCustom.value = "";
+            }
+        }
+    }
+
+    const citySelect = document.getElementById("editCitySelect");
+    const cityCustom = document.getElementById("editCityCustom");
+    const currentCity = call.city || "Алматы";
+
+    if (citySelect) {
+        let cityOptionExists = false;
+        for (let opt of citySelect.options) {
+            if (opt.value === currentCity) {
+                citySelect.value = currentCity;
+                cityOptionExists = true;
+                break;
+            }
+        }
+        if (!cityOptionExists) {
+            citySelect.value = "custom";
+            if (cityCustom) {
+                cityCustom.style.display = "block";
+                cityCustom.value = currentCity;
+            }
+        } else {
+            if (cityCustom) {
+                cityCustom.style.display = "none";
+                cityCustom.value = "";
+            }
+        }
+    }
+
+    const commentInput = document.getElementById("editCommentInput");
+    if (commentInput) commentInput.value = "";
+
+    const alertEl = document.getElementById("editModalAlert");
+    if (alertEl) {
+        alertEl.style.display = "none";
+        alertEl.innerText = "";
+    }
+
+    const modal = document.getElementById("editCallModal");
+    if (modal) {
+        modal.classList.add("open");
+        modal.classList.add("active");
+        modal.style.display = "flex";
+    }
+}
+
+// Закрытие модального окна редактирования
+function closeEditCallModal() {
+    const modal = document.getElementById("editCallModal");
+    if (modal) {
+        modal.classList.remove("open");
+        modal.classList.remove("active");
+        modal.style.display = "none";
+    }
+}
+
+// Быстрое открытие звонка с автоматическим стартом прослушки
+function openCallAndPlayAudio(callId) {
+    openCallModal(callId);
+    // Переключаемся на вкладку Транскрипция (Диалог)
+    const transcriptTab = document.querySelector(".tab-btn[data-tab='tab-transcript']");
+    if (transcriptTab) {
+        transcriptTab.click();
+    }
+    const call = callsData.find(c => c.id == callId);
+    if (call) {
+        initCallAudio(call, true);
+    }
+}
+
+// Экспорт в глобальную область видимости
+window.openEditCallModal = openEditCallModal;
+window.closeEditCallModal = closeEditCallModal;
+window.saveCallEdits = saveCallEdits;
+window.openCallAndPlayAudio = openCallAndPlayAudio;
+window.initCallAudio = initCallAudio;
+window.stopCallAudio = stopCallAudio;
+
+// Сохранение изменений звонка через POST API
+async function saveCallEdits() {
+    const callId = parseInt(document.getElementById("editCallId").value);
+    const mgrSelect = document.getElementById("editManagerSelect").value;
+    const mgrCustom = document.getElementById("editManagerCustom").value.trim();
+    const managerName = (mgrSelect === "custom") ? mgrCustom : mgrSelect;
+
+    const citySelect = document.getElementById("editCitySelect").value;
+    const cityCustom = document.getElementById("editCityCustom").value.trim();
+    const cityName = (citySelect === "custom") ? cityCustom : citySelect;
+
+    const changedBy = document.getElementById("editAuthorSelect").value;
+    const comment = document.getElementById("editCommentInput").value.trim() || "Ручная корректировка имени/города";
+
+    const alertEl = document.getElementById("editModalAlert");
+    const saveBtn = document.getElementById("saveEditModalBtn");
+
+    if (!managerName) {
+        if (alertEl) {
+            alertEl.style.display = "block";
+            alertEl.style.background = "rgba(239, 68, 68, 0.15)";
+            alertEl.style.color = "#f87171";
+            alertEl.innerText = "Пожалуйста, укажите имя менеджера.";
+        }
+        return;
+    }
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerText = "Сохранение...";
+    }
+
+    try {
+        const response = await fetch("/api/calls/update", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                call_id: callId,
+                manager_name: managerName,
+                city_name: cityName,
+                changed_by: changedBy,
+                comment: comment
+            })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            closeEditCallModal();
+            await loadCallsData();
+            
+            // Если было открыто окно разбора этого звонка, перерендерим его
+            const openCall = callsData.find(c => c.id === callId);
+            if (openCall) {
+                const callModal = document.getElementById("callModal");
+                if (callModal && callModal.classList.contains("open")) {
+                    openCallModal(callId);
+                }
+            }
+        } else {
+            if (alertEl) {
+                alertEl.style.display = "block";
+                alertEl.style.background = "rgba(239, 68, 68, 0.15)";
+                alertEl.style.color = "#f87171";
+                alertEl.innerText = "Ошибка сохранения: " + (result.error || "Не удалось сохранить");
+            }
+        }
+    } catch (err) {
+        if (alertEl) {
+            alertEl.style.display = "block";
+            alertEl.style.background = "rgba(239, 68, 68, 0.15)";
+            alertEl.style.color = "#f87171";
+            alertEl.innerText = "Ошибка соединения с сервером: " + err.message;
+        }
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerText = "💾 Сохранить в БД и Журнал";
+        }
+    }
+}
+
+// Загрузка реальных данных из базы данных через calls_data.json и audit_data.json
 async function loadCallsData() {
     try {
-        const res = await fetch("calls_data.json?t=" + new Date().getTime());
-        if (res.ok) {
-            const freshData = await res.json();
+        const [resCalls, resAudit] = await Promise.all([
+            fetch("calls_data.json?t=" + new Date().getTime()),
+            fetch("audit_data.json?t=" + new Date().getTime()).catch(() => null)
+        ]);
+
+        if (resCalls && resCalls.ok) {
+            const freshData = await resCalls.json();
             if (Array.isArray(freshData)) {
                 callsData = freshData;
                 renderCallsTable(callsData);
@@ -1318,19 +1784,19 @@ async function loadCallsData() {
                 renderManagers(callsData);
                 renderClients(callsData);
                 console.log("[AI CRM] Загружены реальные звонки из PostgreSQL:", callsData.length);
-                return;
+            }
+        }
+
+        if (resAudit && resAudit.ok) {
+            const freshAudit = await resAudit.json();
+            if (Array.isArray(freshAudit)) {
+                auditLogsData = freshAudit;
+                renderAuditLogs(auditLogsData);
             }
         }
     } catch (err) {
-        console.warn("[AI CRM] Ошибка загрузки calls_data.json:", err);
+        console.warn("[AI CRM] Ошибка загрузки данных:", err);
     }
-    
-    // Если файл пуст или не найден, отображаем пустое состояние
-    callsData = [];
-    renderCallsTable([]);
-    renderDashboard([]);
-    renderManagers([]);
-    renderClients([]);
 }
 
 // Инициализация событий
@@ -1394,6 +1860,7 @@ document.addEventListener("DOMContentLoaded", () => {
             closeCallModal();
             closeManagerModal();
             closeClientModal();
+            closeEditCallModal();
         }
     });
 
@@ -1436,19 +1903,124 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     });
 
+    // Единая функция фильтрации звонков
+    function applyCallsFilters() {
+        const searchInput = document.getElementById("searchInput");
+        const emotionFilter = document.getElementById("emotionFilter");
+        const scoreFilter = document.getElementById("scoreFilter");
+        const activeBadgeBar = document.getElementById("activeFilterBadgeBar");
+        const activeText = document.getElementById("activeFilterText");
+
+        const searchVal = (searchInput?.value || "").toLowerCase().trim();
+        const emotionVal = emotionFilter?.value || "all";
+        const scoreVal = scoreFilter?.value || "all";
+
+        let filtered = callsData.slice();
+
+        // 1. Поиск по тексту
+        if (searchVal) {
+            filtered = filtered.filter(c => 
+                (c.phone && c.phone.toLowerCase().includes(searchVal)) ||
+                (c.topic && c.topic.toLowerCase().includes(searchVal)) ||
+                (c.city && c.city.toLowerCase().includes(searchVal)) ||
+                (c.manager && c.manager.toLowerCase().includes(searchVal)) ||
+                (c.summary && c.summary.toLowerCase().includes(searchVal))
+            );
+        }
+
+        // 2. Фильтр эмоций / конфликтов
+        if (emotionVal === "conflict") {
+            filtered = filtered.filter(c => 
+                c.conflict === true || 
+                Number(c.csat) <= 2 || 
+                (c.clientTone && (c.clientTone.sentimentEnd === "Недовольный" || c.clientTone.sad >= 15 || c.clientTone.angry > 0))
+            );
+            if (activeBadgeBar) {
+                activeBadgeBar.style.display = "flex";
+                if (activeText) activeText.innerText = `⚠️ Фильтр: показаны звонки с конфликтами и претензиями (${filtered.length})`;
+            }
+        } else if (emotionVal !== "all") {
+            filtered = filtered.filter(c => 
+                c.emotionClass === emotionVal || 
+                (emotionVal === "happy" && c.emotion === "Радость") || 
+                (emotionVal === "neutral" && c.emotion === "Нейтральный") || 
+                (emotionVal === "sad" && c.emotion === "Грусть")
+            );
+            if (activeBadgeBar) activeBadgeBar.style.display = "none";
+        } else {
+            if (activeBadgeBar) activeBadgeBar.style.display = "none";
+        }
+
+        // 3. Фильтр по оценке CSAT
+        if (scoreVal === "2") {
+            filtered = filtered.filter(c => Number(c.csat) <= 2);
+        } else if (scoreVal !== "all") {
+            filtered = filtered.filter(c => Number(c.csat) === parseInt(scoreVal));
+        }
+
+        renderCallsTable(filtered);
+    }
+
+    // Быстрый переход и фильтрация конфликтных звонков по клику на KPI Tone of Voice
+    function filterConflictCalls() {
+        switchView("view-calls");
+        const emotionFilter = document.getElementById("emotionFilter");
+        if (emotionFilter) emotionFilter.value = "conflict";
+        
+        const searchInput = document.getElementById("searchInput");
+        if (searchInput) searchInput.value = "";
+        
+        const scoreFilter = document.getElementById("scoreFilter");
+        if (scoreFilter) scoreFilter.value = "all";
+
+        applyCallsFilters();
+
+        const tableControls = document.querySelector(".table-controls");
+        if (tableControls) {
+            tableControls.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    }
+
+    // Клик по KPI карточке Tone of Voice
+    const kpiToneCard = document.getElementById("kpiToneCard");
+    if (kpiToneCard) {
+        kpiToneCard.onclick = filterConflictCalls;
+    }
+
+    const kpiConflictsCount = document.getElementById("kpiConflictsCount");
+    if (kpiConflictsCount) {
+        kpiConflictsCount.onclick = (e) => {
+            e.stopPropagation();
+            filterConflictCalls();
+        };
+    }
+
+    // Кнопка сброса фильтра конфликтов
+    const resetConflictBtn = document.getElementById("resetConflictFilterBtn");
+    if (resetConflictBtn) {
+        resetConflictBtn.onclick = () => {
+            const emotionFilter = document.getElementById("emotionFilter");
+            if (emotionFilter) emotionFilter.value = "all";
+            applyCallsFilters();
+        };
+    }
+
     // Поиск по таблице звонков
     const searchInput = document.getElementById("searchInput");
     if (searchInput) {
-        searchInput.oninput = (e) => {
-            const val = e.target.value.toLowerCase().trim();
-            const filtered = callsData.filter(c => 
-                (c.phone && c.phone.toLowerCase().includes(val)) ||
-                (c.topic && c.topic.toLowerCase().includes(val)) ||
-                (c.city && c.city.toLowerCase().includes(val)) ||
-                (c.manager && c.manager.toLowerCase().includes(val))
-            );
-            renderCallsTable(filtered);
-        };
+        searchInput.oninput = applyCallsFilters;
+    }
+
+    // Фильтр по эмоциям
+    const emotionFilter = document.getElementById("emotionFilter");
+    if (emotionFilter) {
+        emotionFilter.onchange = applyCallsFilters;
+    }
+
+    // Фильтр по оценкам
+    const scoreFilter = document.getElementById("scoreFilter");
+    if (scoreFilter) {
+        scoreFilter.onchange = applyCallsFilters;
     }
 
     // Поиск по клиентам
@@ -1490,13 +2062,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (val === "all") {
                 renderClients(callsData);
             } else if (val === "repeat") {
-                // Только повторные клиенты
                 const clientCounts = {};
                 callsData.forEach(c => { clientCounts[c.phone] = (clientCounts[c.phone] || 0) + 1; });
                 const filtered = callsData.filter(c => clientCounts[c.phone] > 1);
                 renderClients(filtered);
             } else {
-                // Первое обращение
                 const clientCounts = {};
                 callsData.forEach(c => { clientCounts[c.phone] = (clientCounts[c.phone] || 0) + 1; });
                 const filtered = callsData.filter(c => clientCounts[c.phone] === 1);
@@ -1505,32 +2075,63 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
-    // Фильтр по эмоциям
-    const emotionFilter = document.getElementById("emotionFilter");
-    if (emotionFilter) {
-        emotionFilter.onchange = (e) => {
-            const val = e.target.value;
-            if (val === "all") {
-                renderCallsTable(callsData);
+    // Закрытие модального окна редактирования
+    const closeEditBtn = document.getElementById("closeEditModalBtn");
+    const cancelEditBtn = document.getElementById("cancelEditModalBtn");
+    const editModalBackdrop = document.getElementById("editCallModal");
+
+    if (closeEditBtn) closeEditBtn.onclick = closeEditCallModal;
+    if (cancelEditBtn) cancelEditBtn.onclick = closeEditCallModal;
+    if (editModalBackdrop) {
+        editModalBackdrop.onclick = (e) => {
+            if (e.target.id === "editCallModal") closeEditCallModal();
+        };
+    }
+
+    // Сохранение редактирования звонка
+    const saveEditBtn = document.getElementById("saveEditModalBtn");
+    if (saveEditBtn) {
+        saveEditBtn.onclick = saveCallEdits;
+    }
+
+    // Кастомный ввод менеджера
+    const editMgrSelect = document.getElementById("editManagerSelect");
+    const editMgrCustom = document.getElementById("editManagerCustom");
+    if (editMgrSelect && editMgrCustom) {
+        editMgrSelect.onchange = (e) => {
+            if (e.target.value === "custom") {
+                editMgrCustom.style.display = "block";
+                editMgrCustom.focus();
             } else {
-                const filtered = callsData.filter(c => c.emotionClass === val || (val === "happy" && c.emotion === "Радость") || (val === "neutral" && c.emotion === "Нейтральный") || (val === "sad" && c.emotion === "Грусть"));
-                renderCallsTable(filtered);
+                editMgrCustom.style.display = "none";
             }
         };
     }
 
-    // Фильтр по оценкам
-    const scoreFilter = document.getElementById("scoreFilter");
-    if (scoreFilter) {
-        scoreFilter.onchange = (e) => {
-            const val = e.target.value;
-            if (val === "all") {
-                renderCallsTable(callsData);
+    // Кастомный ввод города
+    const editCitySelect = document.getElementById("editCitySelect");
+    const editCityCustom = document.getElementById("editCityCustom");
+    if (editCitySelect && editCityCustom) {
+        editCitySelect.onchange = (e) => {
+            if (e.target.value === "custom") {
+                editCityCustom.style.display = "block";
+                editCityCustom.focus();
             } else {
-                const filtered = callsData.filter(c => Number(c.csat) === parseInt(val));
-                renderCallsTable(filtered);
+                editCityCustom.style.display = "none";
             }
         };
+    }
+
+    // Поиск по журналу аудита
+    const auditSearchInput = document.getElementById("auditSearchInput");
+    if (auditSearchInput) {
+        auditSearchInput.oninput = () => renderAuditLogs(auditLogsData);
+    }
+
+    // Фильтр по полям аудита
+    const auditFieldFilter = document.getElementById("auditFieldFilter");
+    if (auditFieldFilter) {
+        auditFieldFilter.onchange = () => renderAuditLogs(auditLogsData);
     }
 
     // Кнопка "Обновить"
