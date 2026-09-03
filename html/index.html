@@ -438,7 +438,187 @@
 
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="closeModalFooterBtn">Закрыть</button>
-                <button class="btn btn-primary" id="saveCrmBtn">Синхронизировать с сделкой #45291</button>
+                <button class="btn btn-primary" id="saveCrmBtn">Синхронизировать со сделкой в Битрикс24</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО ОБЩЕГО АНАЛИЗА РАБОТЫ МЕНЕДЖЕРА -->
+    <div class="modal-backdrop" id="managerAnalyticsModal">
+        <div class="modal-dialog modal-dialog-lg">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <div class="manager-modal-profile">
+                        <div class="manager-modal-avatar" id="mgrModalAvatar">Ж</div>
+                        <div>
+                            <div class="modal-badge-row">
+                                <span class="badge badge-success" id="mgrModalCsatBadge">⭐ 5.0 / 5.0 CSAT</span>
+                                <span class="badge badge-primary" id="mgrModalCallsCountBadge">1 звонок(ов) в базе</span>
+                                <span class="badge badge-outline" id="mgrModalToneBadge">100% Позитив</span>
+                            </div>
+                            <h2 class="modal-title" id="mgrModalName">Жандос</h2>
+                            <p class="manager-modal-subtitle" id="mgrModalSubtitle">Менеджер отдела продаж и консультаций • Филиал: Алматы</p>
+                        </div>
+                    </div>
+                </div>
+                <button class="modal-close-btn" id="closeManagerModalBtn">&times;</button>
+            </div>
+
+            <!-- Вкладки аналитики менеджера -->
+            <div class="modal-tabs">
+                <button class="tab-btn active" data-mgr-tab="mgr-tab-overview">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+                    Общий AI-аудит работы
+                </button>
+                <button class="tab-btn" data-mgr-tab="mgr-tab-script">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    Стандарты и Скрипт продаж
+                </button>
+                <button class="tab-btn" data-mgr-tab="mgr-tab-tone">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                    Tone of Voice & Акустика
+                </button>
+                <button class="tab-btn" data-mgr-tab="mgr-tab-calls">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    Звонки сотрудника (<span id="mgrModalCallsTabCount">0</span>)
+                </button>
+            </div>
+
+            <!-- Тело модального окна менеджера -->
+            <div class="modal-body">
+                <!-- 4 KPI плашки менеджера -->
+                <div class="mgr-kpi-row">
+                    <div class="mgr-kpi-item">
+                        <div class="mgr-kpi-label">Диалоги и Время на линии</div>
+                        <div class="mgr-kpi-val" id="mgrKpiTotalCalls">0 звонков</div>
+                        <div class="mgr-kpi-sub" id="mgrKpiDurationStats">Всего: 00:00 • Ср: 00:00</div>
+                    </div>
+                    <div class="mgr-kpi-item">
+                        <div class="mgr-kpi-label">Соблюдение скрипта</div>
+                        <div class="mgr-kpi-val text-purple" id="mgrKpiScriptAvg">0%</div>
+                        <div class="mgr-kpi-sub" id="mgrKpiScriptSub">Стандарт обслуживания</div>
+                    </div>
+                    <div class="mgr-kpi-item">
+                        <div class="mgr-kpi-label">Удовлетворенность (CSAT)</div>
+                        <div class="mgr-kpi-val text-yellow" id="mgrKpiCsatAvg">⭐ 0.0</div>
+                        <div class="mgr-kpi-sub" id="mgrKpiPoliteness">Вежливость: 5.0 / 5.0</div>
+                    </div>
+                    <div class="mgr-kpi-item highlight">
+                        <div class="mgr-kpi-label">Упущенная выгода</div>
+                        <div class="mgr-kpi-val text-red" id="mgrKpiLostSales">0 ₸</div>
+                        <div class="mgr-kpi-sub" id="mgrKpiLostSub">Не предложено хранение</div>
+                    </div>
+                </div>
+
+                <!-- ВКЛАДКА 1: ОБЩИЙ AI-АУДИТ РАБОТЫ -->
+                <div class="mgr-tab-content active" id="mgr-tab-overview">
+                    <div class="mgr-audit-grid">
+                        <!-- Сильные стороны -->
+                        <div class="card mgr-card-strengths">
+                            <div class="mgr-card-heading">
+                                <span class="mgr-icon green">🌟</span>
+                                <div>
+                                    <h3>Сильные стороны менеджера</h3>
+                                    <p class="card-subtitle">Что сотрудник делает на отлично по оценке нейросети</p>
+                                </div>
+                            </div>
+                            <div class="mgr-strengths-list" id="mgrStrengthsList">
+                                <!-- Генерируется динамически -->
+                            </div>
+                        </div>
+
+                        <!-- Точки роста и повторяющиеся ошибки -->
+                        <div class="card mgr-card-weaknesses">
+                            <div class="mgr-card-heading">
+                                <span class="mgr-icon yellow">⚠️</span>
+                                <div>
+                                    <h3>Точки роста и ошибки в диалогах</h3>
+                                    <p class="card-subtitle">Систематические упущения, влияющие на средний чек и конверсию</p>
+                                </div>
+                            </div>
+                            <div class="mgr-weaknesses-list" id="mgrWeaknessesList">
+                                <!-- Генерируется динамически -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Рекомендации руководителю (РОП) -->
+                    <div class="card mgr-recommendations-card">
+                        <div class="mgr-card-heading">
+                            <span class="mgr-icon purple">🎯</span>
+                            <div>
+                                <h3>Персональный план развития от AI (для РОПа)</h3>
+                                <p class="card-subtitle">Конкретные шаги для повышения эффективности сотрудника</p>
+                            </div>
+                        </div>
+                        <div class="mgr-rop-tips" id="mgrRopRecommendations">
+                            <!-- Генерируется динамически -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ВКЛАДКА 2: СТАНДАРТЫ И СКРИПТ ПРОДАЖ -->
+                <div class="mgr-tab-content" id="mgr-tab-script">
+                    <div class="card">
+                        <h3>📋 Декомпозиция соблюдения скрипта продаж по всем звонкам</h3>
+                        <p class="card-subtitle">Процент успешного прохождения каждого обязательного этапа</p>
+                        
+                        <div class="script-breakdown-list" id="mgrScriptStagesList">
+                            <!-- Заполняется в JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ВКЛАДКА 3: TONE OF VOICE & АКУСТИКА -->
+                <div class="mgr-tab-content" id="mgr-tab-tone">
+                    <div class="tone-analytics-grid">
+                        <div class="card">
+                            <h3>🎙️ Эмоциональный баланс речи менеджера</h3>
+                            <p class="card-subtitle">Анализ эмоционального фона по моделям Wav2Vec2 и RuBERT</p>
+                            
+                            <div class="script-bars-list" id="mgrToneBarsList">
+                                <!-- Заполняется в JS -->
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3>🔊 Акустические метрики речи</h3>
+                            <p class="card-subtitle">Темп, динамика громкости и баланс пауз</p>
+                            
+                            <div class="acoustics-list" id="mgrAcousticsList">
+                                <!-- Заполняется в JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ВКЛАДКА 4: ЗВОНКИ СОТРУДНИКА -->
+                <div class="mgr-tab-content" id="mgr-tab-calls">
+                    <div class="table-container" style="border: none; background: transparent;">
+                        <table class="crm-table">
+                            <thead>
+                                <tr>
+                                    <th>ID & Дата</th>
+                                    <th>Клиент</th>
+                                    <th>Тема / Товары</th>
+                                    <th>Длительность</th>
+                                    <th>Эмоция</th>
+                                    <th>CSAT</th>
+                                    <th>Скрипт</th>
+                                    <th class="text-right">Действие</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mgrCallsTableBody">
+                                <!-- Заполняется в JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="closeManagerModalFooterBtn">Закрыть</button>
+                <button class="btn btn-primary" id="mgrExportReportBtn">Экспортировать отчет РОПа</button>
             </div>
         </div>
     </div>

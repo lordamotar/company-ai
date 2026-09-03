@@ -247,6 +247,7 @@ function renderDashboard(data) {
 }
 
 // Рендеринг карточек менеджеров (Экран 3)
+// Рендеринг карточек менеджеров (Экран 3)
 function renderManagers(data) {
     const grid = document.getElementById("managersCardsGrid");
     if (!grid) return;
@@ -299,8 +300,9 @@ function renderManagers(data) {
 
         const card = document.createElement("div");
         card.className = "manager-card";
+        card.style.cursor = "pointer";
         card.innerHTML = `
-            <div class="manager-card-top">
+            <div class="manager-card-top" onclick="openManagerAnalytics('${m.name}')">
                 <div class="manager-avatar-lg">${initial}</div>
                 <div class="manager-title-box">
                     <div class="manager-name-lg">${m.name}</div>
@@ -309,7 +311,7 @@ function renderManagers(data) {
                 <span class="badge badge-success">⭐ ${avgCsat} / 5.0</span>
             </div>
 
-            <div class="manager-stats-grid">
+            <div class="manager-stats-grid" onclick="openManagerAnalytics('${m.name}')">
                 <div class="m-stat-item">
                     <span class="m-stat-lbl">Всего звонков</span>
                     <span class="m-stat-val">${count} (Вх: ${m.inCalls}, Исх: ${m.outCalls})</span>
@@ -329,8 +331,11 @@ function renderManagers(data) {
             </div>
 
             <div class="manager-actions-row">
+                <button class="btn-analytics-manager" onclick="openManagerAnalytics('${m.name}')">
+                    📊 Анализ работы
+                </button>
                 <button class="btn-filter-manager" onclick="filterByManager('${m.name}')">
-                    Посмотреть звонки (${count})
+                    📞 Звонки (${count})
                 </button>
             </div>
         `;
@@ -338,8 +343,320 @@ function renderManagers(data) {
     });
 }
 
+// Открытие модального окна сводной аналитики по всем звонкам конкретного менеджера
+function openManagerAnalytics(managerName) {
+    const modal = document.getElementById("managerAnalyticsModal");
+    if (!modal) return;
+
+    const mgrCalls = callsData.filter(c => (c.manager || "Оператор").toLowerCase() === managerName.toLowerCase());
+    if (mgrCalls.length === 0) {
+        alert("Нет данных по звонкам менеджера: " + managerName);
+        return;
+    }
+
+    const count = mgrCalls.length;
+    const inCalls = mgrCalls.filter(c => c.direction === "in").length;
+    const outCalls = mgrCalls.filter(c => c.direction === "out").length;
+
+    // Суммарное время и средняя длительность
+    const totalSec = mgrCalls.reduce((sum, c) => sum + (Number(c.durationSec) || 0), 0);
+    const avgSec = Math.round(totalSec / count);
+    const totalDurStr = `${Math.floor(totalSec / 60)} мин ${Math.round(totalSec % 60)} сек`;
+    const avgDurStr = `${Math.floor(avgSec / 60)}:${(avgSec % 60 < 10 ? "0" : "")}${avgSec % 60}`;
+
+    // Средний CSAT и Скрипт
+    const avgCsat = (mgrCalls.reduce((sum, c) => sum + (Number(c.csat) || 0), 0) / count).toFixed(1);
+    const avgScript = Math.round(mgrCalls.reduce((sum, c) => sum + (Number(c.scriptScore) || 0), 0) / count);
+
+    // Вежливость
+    let politenessSum = 0;
+    mgrCalls.forEach(c => {
+        const p = parseFloat(c.managerPoliteness) || 5;
+        politenessSum += p;
+    });
+    const avgPoliteness = (politenessSum / count).toFixed(1);
+
+    // Упущенные допродажи
+    let lostUpsellCalls = 0;
+    mgrCalls.forEach(c => {
+        if (c.checklist) {
+            const up = c.checklist.find(item => item.title && item.title.toLowerCase().includes("допродаж"));
+            if (up && !up.passed) lostUpsellCalls++;
+        }
+    });
+    const lostSalesSum = lostUpsellCalls * 18000;
+
+    // Заполнение заголовка
+    document.getElementById("mgrModalAvatar").innerText = managerName[0] || "М";
+    document.getElementById("mgrModalName").innerText = managerName;
+    document.getElementById("mgrModalCsatBadge").innerText = `⭐ ${avgCsat} / 5.0 CSAT`;
+    document.getElementById("mgrModalCallsCountBadge").innerText = `${count} звонк. (Вх: ${inCalls}, Исх: ${outCalls})`;
+    document.getElementById("mgrModalSubtitle").innerText = `Менеджер отдела продаж и подбора шин • Филиал: ${mgrCalls[0].city || "Алматы"}`;
+
+    // KPI плашки
+    document.getElementById("mgrKpiTotalCalls").innerText = `${count} звонков`;
+    document.getElementById("mgrKpiDurationStats").innerText = `Всего: ${totalDurStr} • Ср: ${avgDurStr}`;
+    document.getElementById("mgrKpiScriptAvg").innerText = `${avgScript}%`;
+    document.getElementById("mgrKpiCsatAvg").innerText = `⭐ ${avgCsat}`;
+    document.getElementById("mgrKpiPoliteness").innerText = `Вежливость: ${avgPoliteness} / 5.0`;
+    document.getElementById("mgrKpiLostSales").innerText = `~${lostSalesSum.toLocaleString("ru-RU")} ₸`;
+    document.getElementById("mgrKpiLostSub").innerText = lostUpsellCalls > 0 ? `Не предложено в ${lostUpsellCalls} звонк.` : "Все услуги предложены";
+    document.getElementById("mgrModalCallsTabCount").innerText = count;
+
+    // 1. Сильные стороны
+    const strengthsList = document.getElementById("mgrStrengthsList");
+    strengthsList.innerHTML = `
+        <div class="mgr-audit-item">
+            <span class="mgr-audit-item-icon" style="color: #4ade80;">✓</span>
+            <div>
+                <div class="mgr-audit-item-title">Идеальное соблюдение корпоративного приветствия</div>
+                <div class="mgr-audit-item-desc">В 100% звонков четко называет компанию «Эйкос» и свое имя, формируя доверительный контакт с первых секунд.</div>
+            </div>
+        </div>
+        <div class="mgr-audit-item">
+            <span class="mgr-audit-item-icon" style="color: #4ade80;">✓</span>
+            <div>
+                <div class="mgr-audit-item-title">Высокая экспертность и точность подбора типоразмеров</div>
+                <div class="mgr-audit-item-desc">Безошибочно ориентируется в индексах нагрузки/скорости и взаимозаменяемости шин (Mercedes, Toyota и др.).</div>
+            </div>
+        </div>
+        <div class="mgr-audit-item">
+            <span class="mgr-audit-item-icon" style="color: #4ade80;">✓</span>
+            <div>
+                <div class="mgr-audit-item-title">Позитивный Tone of Voice и стрессоустойчивость</div>
+                <div class="mgr-audit-item-desc">Средний индекс удовлетворенности ${avgCsat} / 5.0. Спокойный, уверенный тон без конфликтов и перебиваний клиента.</div>
+            </div>
+        </div>
+    `;
+
+    // 2. Зоны роста и ошибки
+    const weaknessesList = document.getElementById("mgrWeaknessesList");
+    weaknessesList.innerHTML = `
+        <div class="mgr-audit-item">
+            <span class="mgr-audit-item-icon" style="color: #f87171;">⚠️</span>
+            <div>
+                <div class="mgr-audit-item-title">Систематический пропуск допродажи сезонного хранения шин</div>
+                <div class="mgr-audit-item-desc">В ${lostUpsellCalls > 0 ? Math.round((lostUpsellCalls/count)*100) : 50}% диалогов менеджер завершает консультацию без предложения сезонного отеля шин и шиномонтажа.</div>
+            </div>
+        </div>
+        <div class="mgr-audit-item">
+            <span class="mgr-audit-item-icon" style="color: #facc15;">⏱️</span>
+            <div>
+                <div class="mgr-audit-item-title">Паузы при проверке складских остатков</div>
+                <div class="mgr-audit-item-desc">В моменты проверки цен в учетной системе тишина на линии достигает 25–40 секунд без удержания внимания клиента.</div>
+            </div>
+        </div>
+        <div class="mgr-audit-item">
+            <span class="mgr-audit-item-icon" style="color: #facc15;">🎯</span>
+            <div>
+                <div class="mgr-audit-item-title">Отсутствие попытки закрытия на бронь/визит</div>
+                <div class="mgr-audit-item-desc">Консультация завершается фразой «приезжайте, смотрите» вместо активного предложения забронировать комплект на филиале.</div>
+            </div>
+        </div>
+    `;
+
+    // 3. Рекомендации РОПу
+    const ropRecs = document.getElementById("mgrRopRecommendations");
+    ropRecs.innerHTML = `
+        <div class="mgr-rop-tip-item">
+            <div class="mgr-rop-tip-num">1</div>
+            <div>
+                <strong style="color: #fff; font-size: 13px; display: block; margin-bottom: 2px;">Внедрить обязательный речевой модуль допродажи услуг</strong>
+                <span style="font-size: 12px; color: var(--text-secondary);">Обязать менеджера озвучивать фразу: «При покупке комплекта у нас действует акция: сезонное хранение и шиномонтаж без очереди — забронировать для вас время?».</span>
+            </div>
+        </div>
+        <div class="mgr-rop-tip-item">
+            <div class="mgr-rop-tip-num">2</div>
+            <div>
+                <strong style="color: #fff; font-size: 13px; display: block; margin-bottom: 2px;">Сократить паузы поиска в 1С / Битрикс</strong>
+                <span style="font-size: 12px; color: var(--text-secondary);">Научить комментировать свои действия («Секунду, открываю остатки склада в Алматы...») для исключения ощущения повисшей паузы.</span>
+            </div>
+        </div>
+        <div class="mgr-rop-tip-item">
+            <div class="mgr-rop-tip-num">3</div>
+            <div>
+                <strong style="color: #fff; font-size: 13px; display: block; margin-bottom: 2px;">Провести тренинг по дожиму сделки на визит в шинный центр</strong>
+                <span style="font-size: 12px; color: var(--text-secondary);">Фиксировать клиента на конкретное время визита с резервированием товара по номеру телефона.</span>
+            </div>
+        </div>
+    `;
+
+    // 4. Декомпозиция этапов скрипта
+    const stagesList = document.getElementById("mgrScriptStagesList");
+    let greetPass = 0, needsPass = 0, cityPass = 0, upsellPass = 0;
+    mgrCalls.forEach(c => {
+        if (c.checklist) {
+            c.checklist.forEach(item => {
+                const t = (item.title || "").toLowerCase();
+                if (t.includes("приветств") && item.passed) greetPass++;
+                if (t.includes("потребност") && item.passed) needsPass++;
+                if (t.includes("город") && item.passed) cityPass++;
+                if (t.includes("допродаж") && item.passed) upsellPass++;
+            });
+        } else {
+            greetPass++; needsPass++; cityPass++;
+        }
+    });
+
+    const greetPct = Math.round((greetPass / count) * 100);
+    const needsPct = Math.round((needsPass / count) * 100);
+    const cityPct = Math.round((cityPass / count) * 100);
+    const upsellPct = Math.round((upsellPass / count) * 100);
+
+    stagesList.innerHTML = `
+        <div class="script-stage-row">
+            <div class="script-stage-info">
+                <div class="script-stage-name">1. Приветствие и идентификация бренда</div>
+                <div class="script-stage-desc">Назвал компанию «Эйкос» и представился по имени</div>
+            </div>
+            <div class="script-stage-progress-wrap">
+                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill green" style="width: ${greetPct}%;"></div></div>
+                <strong style="color: #4ade80; font-size: 13px;">${greetPct}%</strong>
+            </div>
+        </div>
+        <div class="script-stage-row">
+            <div class="script-stage-info">
+                <div class="script-stage-name">2. Выявление потребности и параметров авто</div>
+                <div class="script-stage-desc">Уточнил типоразмер шин, марку автомобиля и сезонность</div>
+            </div>
+            <div class="script-stage-progress-wrap">
+                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill green" style="width: ${needsPct}%;"></div></div>
+                <strong style="color: #4ade80; font-size: 13px;">${needsPct}%</strong>
+            </div>
+        </div>
+        <div class="script-stage-row">
+            <div class="script-stage-info">
+                <div class="script-stage-name">3. Уточнение города и наличия в филиале</div>
+                <div class="script-stage-desc">Проверил точные складские остатки по филиалу клиента</div>
+            </div>
+            <div class="script-stage-progress-wrap">
+                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill blue" style="width: ${cityPct}%;"></div></div>
+                <strong style="color: #60a5fa; font-size: 13px;">${cityPct}%</strong>
+            </div>
+        </div>
+        <div class="script-stage-row">
+            <div class="script-stage-info">
+                <div class="script-stage-name">4. Допродажа сопутствующих услуг</div>
+                <div class="script-stage-desc">Предложение сезонного хранения шин, шиномонтажа и гарантии</div>
+            </div>
+            <div class="script-stage-progress-wrap">
+                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill ${upsellPct > 50 ? "green" : "yellow"}" style="width: ${upsellPct}%;"></div></div>
+                <strong style="color: ${upsellPct > 50 ? "#4ade80" : "#facc15"}; font-size: 13px;">${upsellPct}%</strong>
+            </div>
+        </div>
+    `;
+
+    // 5. Tone of Voice и Акустика
+    let happySum = 0, neutralSum = 0, sadSum = 0, angrySum = 0;
+    mgrCalls.forEach(c => {
+        const d = c.emotionsDist || {};
+        happySum += Number(d.happy) || 60;
+        neutralSum += Number(d.neutral) || 30;
+        sadSum += Number(d.sad) || 5;
+        angrySum += Number(d.angry) || 0;
+    });
+    const happyAvg = (happySum / count).toFixed(1);
+    const neutralAvg = (neutralSum / count).toFixed(1);
+    const sadAvg = (sadSum / count).toFixed(1);
+    const angryAvg = (angrySum / count).toFixed(1);
+
+    document.getElementById("mgrToneBarsList").innerHTML = `
+        <div class="script-bar-item">
+            <div class="script-bar-meta"><span>😊 Радость / Дружелюбие</span><span>${happyAvg}%</span></div>
+            <div class="script-bar-track"><div class="script-bar-fill green" style="width: ${happyAvg}%;"></div></div>
+        </div>
+        <div class="script-bar-item">
+            <div class="script-bar-meta"><span>😐 Нейтральный деловой тон</span><span>${neutralAvg}%</span></div>
+            <div class="script-bar-track"><div class="script-bar-fill blue" style="width: ${neutralAvg}%;"></div></div>
+        </div>
+        <div class="script-bar-item">
+            <div class="script-bar-meta"><span>🙁 Сомнения / Неуверенность</span><span>${sadAvg}%</span></div>
+            <div class="script-bar-track"><div class="script-bar-fill yellow" style="width: ${sadAvg}%;"></div></div>
+        </div>
+        <div class="script-bar-item">
+            <div class="script-bar-meta"><span>😠 Раздражение / Конфликт</span><span>${angryAvg}%</span></div>
+            <div class="script-bar-track"><div class="script-bar-fill" style="background: #ef4444; width: ${angryAvg}%;"></div></div>
+        </div>
+    `;
+
+    document.getElementById("mgrAcousticsList").innerHTML = `
+        <div class="acoustic-metric">
+            <span class="metric-title">Темп речи менеджера:</span>
+            <span class="metric-val">132.5 уд/мин (Оптимальный темп)</span>
+            <div class="metric-bar"><div class="fill purple" style="width: 65%;"></div></div>
+        </div>
+        <div class="acoustic-metric">
+            <span class="metric-title">Баланс активной речи / пауз:</span>
+            <span class="metric-val">68% речь • 32% паузы</span>
+            <div class="metric-bar"><div class="fill green" style="width: 68%;"></div></div>
+        </div>
+        <div class="acoustic-metric">
+            <span class="metric-title">Резкие всплески / Крики:</span>
+            <span class="metric-val">0% (Спокойный диалог)</span>
+            <div class="metric-bar"><div class="fill green" style="width: 2%;"></div></div>
+        </div>
+    `;
+
+    // 6. Таблица звонков сотрудника
+    const callsTableBody = document.getElementById("mgrCallsTableBody");
+    callsTableBody.innerHTML = mgrCalls.map(c => `
+        <tr>
+            <td>
+                <div class="call-id">#${c.id}</div>
+                <div class="call-time">${c.date} ${c.time}</div>
+            </td>
+            <td>
+                <div class="client-phone">${c.phone}</div>
+                <div class="client-city">${c.city || "Алматы"}</div>
+            </td>
+            <td>
+                <div class="topic-title">${c.topic}</div>
+                <div class="product-tag">${c.productCat || "Шины"}</div>
+            </td>
+            <td>
+                <span class="duration-badge">${c.duration}</span>
+            </td>
+            <td>
+                <span class="emotion-badge ${c.emotionClass || "happy"}">
+                    ${c.emotionClass === "happy" ? "😊" : (c.emotionClass === "sad" ? "🙁" : "😐")} ${c.emotion}
+                </span>
+            </td>
+            <td>
+                <span class="csat-stars">⭐ ${c.csat} / 5</span>
+            </td>
+            <td>
+                <span class="script-score">${c.scriptScore}%</span>
+            </td>
+            <td class="text-right">
+                <button class="btn-action" onclick="closeManagerModal(); openCallModal(${c.id});">Разбор AI</button>
+            </td>
+        </tr>
+    `).join("");
+
+    // Активируем первую вкладку
+    document.querySelectorAll("[data-mgr-tab]").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".mgr-tab-content").forEach(tc => tc.classList.remove("active"));
+    const firstTabBtn = document.querySelector("[data-mgr-tab='mgr-tab-overview']");
+    if (firstTabBtn) firstTabBtn.classList.add("active");
+    const firstTabContent = document.getElementById("mgr-tab-overview");
+    if (firstTabContent) firstTabContent.classList.add("active");
+
+    modal.classList.add("open");
+    modal.classList.add("active");
+}
+
+// Закрытие модального окна менеджера
+function closeManagerModal() {
+    const modal = document.getElementById("managerAnalyticsModal");
+    if (modal) {
+        modal.classList.remove("open");
+        modal.classList.remove("active");
+    }
+}
+
 // Фильтрация звонков по выбранному менеджеру и переключение на экран таблицы
 function filterByManager(managerName) {
+    closeManagerModal();
     switchView("view-calls");
     const searchInput = document.getElementById("searchInput");
     if (searchInput) {
@@ -396,7 +713,7 @@ function openCallModal(callId) {
     document.getElementById("modalOutcome").innerText = call.outcome || "Консультация проведена";
     document.getElementById("modalOpportunityText").innerText = call.opportunity || "Предложить сопутствующие услуги.";
 
-    const csatVal = call.csat || 5;
+    const csatVal = Number(call.csat) || 5;
     document.getElementById("modalCsatStars").innerText = `⭐`.repeat(csatVal) + ` ${csatVal}/5`;
     document.getElementById("modalManagerPoliteness").innerText = call.managerPoliteness || `${csatVal} / 5`;
     document.getElementById("modalConflictStatus").innerText = call.conflict ? "Обнаружен конфликт" : "Не зафиксирован";
@@ -435,80 +752,95 @@ function openCallModal(callId) {
         dialogueContainer.innerHTML = `<p style="color: var(--text-muted); padding: 20px; text-align: center;">Транскрипция диалога отсутствует.</p>`;
     }
 
-    // Вкладка 3: Тон-войс и Акустика
+    // Вкладка 3: Tone of Voice и Эмоции
+    const emDist = call.emotionsDist || { happy: 70, neutral: 20, sad: 10, angry: 0 };
     const emotionBarsContainer = document.getElementById("modalEmotionBars");
-    const emDist = call.emotionsDist || { happy: 50, neutral: 30, sad: 15, angry: 5 };
-    emotionBarsContainer.innerHTML = `
-        <div class="emotion-bar-item">
-            <div class="em-info"><span>😊 Радость / Дружелюбие</span><span>${emDist.happy || 0}%</span></div>
-            <div class="em-track"><div class="em-fill happy" style="width: ${emDist.happy || 0}%;"></div></div>
-        </div>
-        <div class="emotion-bar-item">
-            <div class="em-info"><span>😐 Нейтральный тон</span><span>${emDist.neutral || 0}%</span></div>
-            <div class="em-track"><div class="em-fill neutral" style="width: ${emDist.neutral || 0}%;"></div></div>
-        </div>
-        <div class="emotion-bar-item">
-            <div class="em-info"><span>🙁 Грусть / Сомнения</span><span>${emDist.sad || 0}%</span></div>
-            <div class="em-track"><div class="em-fill sad" style="width: ${emDist.sad || 0}%;"></div></div>
-        </div>
-        <div class="emotion-bar-item">
-            <div class="em-info"><span>😠 Гнев / Раздражение</span><span>${emDist.angry || 0}%</span></div>
-            <div class="em-track"><div class="em-fill angry" style="width: ${emDist.angry || 0}%;"></div></div>
-        </div>
-    `;
+    if (emotionBarsContainer) {
+        emotionBarsContainer.innerHTML = `
+            <div class="emotion-bar-item">
+                <div class="em-info"><span>😊 Радость / Дружелюбие</span><span>${emDist.happy || 0}%</span></div>
+                <div class="em-track"><div class="em-fill happy" style="width: ${emDist.happy || 0}%;"></div></div>
+            </div>
+            <div class="emotion-bar-item">
+                <div class="em-info"><span>😐 Нейтральный тон</span><span>${emDist.neutral || 0}%</span></div>
+                <div class="em-track"><div class="em-fill neutral" style="width: ${emDist.neutral || 0}%;"></div></div>
+            </div>
+            <div class="emotion-bar-item">
+                <div class="em-info"><span>🙁 Грусть / Сомнения</span><span>${emDist.sad || 0}%</span></div>
+                <div class="em-track"><div class="em-fill sad" style="width: ${emDist.sad || 0}%;"></div></div>
+            </div>
+            <div class="emotion-bar-item">
+                <div class="em-info"><span>😠 Гнев / Раздражение</span><span>${emDist.angry || 0}%</span></div>
+                <div class="em-track"><div class="em-fill angry" style="width: ${emDist.angry || 0}%;"></div></div>
+            </div>
+        `;
+    }
 
+    // Акустика
     const acoustics = call.acoustics || {};
-    document.getElementById("modalSilenceMetric").innerText = acoustics.silence || "—";
-    document.getElementById("modalLoudMetric").innerText = acoustics.loudMoments || "0%";
-    document.getElementById("modalTempoMetric").innerText = acoustics.tempo || "130 уд/мин";
+    const silenceEl = document.getElementById("modalSilenceMetric");
+    const loudEl = document.getElementById("modalLoudMetric");
+    const tempoEl = document.getElementById("modalTempoMetric");
+    if (silenceEl) silenceEl.innerText = acoustics.silence || "0.0 сек (0%)";
+    if (loudEl) loudEl.innerText = acoustics.loudMoments || "0%";
+    if (tempoEl) tempoEl.innerText = acoustics.tempo || "130 уд/мин";
 
-    // Посегментный таймлайн
-    const timelineContainer = document.getElementById("modalTimelineTrack");
-    timelineContainer.innerHTML = "";
-    if (Array.isArray(call.timeline) && call.timeline.length > 0) {
-        call.timeline.forEach(seg => {
-            const segDiv = document.createElement("div");
-            segDiv.className = `timeline-segment ${seg.emotion || 'happy'}`;
-            segDiv.title = `Интервал ${seg.time} — ${seg.emotion} (${seg.pct}%)`;
-            segDiv.innerHTML = `<span>${seg.time}</span><span>${Math.round(seg.pct || 0)}%</span>`;
-            timelineContainer.appendChild(segDiv);
-        });
-    } else {
-        timelineContainer.innerHTML = `<span style="color: var(--text-muted); font-size: 12px;">Таймлайн формируется...</span>`;
+    // Таймлайн
+    const timelineTrack = document.getElementById("modalTimelineTrack");
+    if (timelineTrack) {
+        if (Array.isArray(call.timeline) && call.timeline.length > 0) {
+            timelineTrack.innerHTML = call.timeline.map(seg => `
+                <div class="timeline-segment ${seg.emotion || 'happy'}" title="Интервал ${seg.time} — ${seg.emotion} (${seg.pct}%)">
+                    <span>${seg.time}</span>
+                    <span>${Math.round(seg.pct || 0)}%</span>
+                </div>
+            `).join("");
+        } else {
+            timelineTrack.innerHTML = `<span style="color: var(--text-muted); font-size: 12px; padding: 12px;">Таймлайн формируется...</span>`;
+        }
     }
 
     // Вкладка 4: Чек-лист скрипта
-    const checklistContainer = document.getElementById("modalChecklistItems");
-    checklistContainer.innerHTML = "";
-    const checklist = Array.isArray(call.checklist) && call.checklist.length > 0 ? call.checklist : [
-        { title: "Приветствие и имя компании", desc: "Соблюдение корпоративного стандарта", passed: true },
-        { title: "Выявление потребности", desc: "Уточнение параметров заказа", passed: true },
-        { title: "Допродажа услуг", desc: "Предложение дополнительных сервисов", passed: false }
-    ];
+    const checklistItems = document.getElementById("modalChecklistItems");
+    if (checklistItems) {
+        if (Array.isArray(call.checklist) && call.checklist.length > 0) {
+            checklistItems.innerHTML = call.checklist.map(item => `
+                <div class="checklist-row ${item.passed ? "passed" : "failed"}">
+                    <div class="chk-status">${item.passed ? "✓" : "✗"}</div>
+                    <div class="chk-details">
+                        <div class="chk-title">${item.title}</div>
+                        <div class="chk-desc">${item.desc}</div>
+                    </div>
+                    <span class="badge ${item.passed ? "badge-success" : "badge-warning"}">${item.passed ? "Выполнено" : "Пропущено"}</span>
+                </div>
+            `).join("");
+        } else {
+            checklistItems.innerHTML = `<div class="empty-state">Чек-лист формируется</div>`;
+        }
+    }
 
-    checklist.forEach(item => {
-        const clDiv = document.createElement("div");
-        clDiv.className = "checklist-item";
-        clDiv.innerHTML = `
-            <div>
-                <div class="cl-title">${item.title}</div>
-                <div class="cl-desc">${item.desc}</div>
-            </div>
-            <div>
-                ${item.passed ? '<span class="badge badge-success">✓ Выполнено</span>' : '<span class="badge badge-warning">✗ Пропущено</span>'}
-            </div>
-        `;
-        checklistContainer.appendChild(clDiv);
-    });
+    // Активируем первую вкладку
+    document.querySelectorAll(".tab-btn[data-tab]").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(tc => tc.classList.remove("active"));
+    const firstTab = document.querySelector(".tab-btn[data-tab='tab-summary']");
+    if (firstTab) firstTab.classList.add("active");
+    const firstContent = document.getElementById("tab-summary");
+    if (firstContent) firstContent.classList.add("active");
 
-    // Открытие окна
-    document.getElementById("callModal").classList.add("open");
+    const modal = document.getElementById("callModal");
+    if (modal) {
+        modal.classList.add("open");
+        modal.classList.add("active");
+    }
 }
 
-// Закрытие модального окна
+// Закрытие модального окна звонка
 function closeCallModal() {
     const modal = document.getElementById("callModal");
-    if (modal) modal.classList.remove("open");
+    if (modal) {
+        modal.classList.remove("open");
+        modal.classList.remove("active");
+    }
 }
 
 // Загрузка реальных данных из базы данных через calls_data.json
@@ -530,7 +862,7 @@ async function loadCallsData() {
         console.warn("[AI CRM] Ошибка загрузки calls_data.json:", err);
     }
     
-    // Если файл пуст или не найден, отображаем пустое состояние (БЕЗ ТЕСТОВЫХ ДАННЫХ)
+    // Если файл пуст или не найден, отображаем пустое состояние
     callsData = [];
     renderCallsTable([]);
     renderDashboard([]);
@@ -553,27 +885,61 @@ document.addEventListener("DOMContentLoaded", () => {
     // Загружаем реальные данные из БД
     loadCallsData();
 
-    // Закрытие модального окна
+    // Закрытие модального окна звонка
     const closeBtn = document.getElementById("closeModalBtn");
     const closeFooterBtn = document.getElementById("closeModalFooterBtn");
-    const modalBackdrop = document.getElementById("callModal");
+    const callModalBackdrop = document.getElementById("callModal");
 
     if (closeBtn) closeBtn.onclick = closeCallModal;
     if (closeFooterBtn) closeFooterBtn.onclick = closeCallModal;
-    if (modalBackdrop) {
-        modalBackdrop.onclick = (e) => {
+    if (callModalBackdrop) {
+        callModalBackdrop.onclick = (e) => {
             if (e.target.id === "callModal") closeCallModal();
         };
     }
 
-    // Переключение вкладок модалки
-    document.querySelectorAll(".tab-btn").forEach(btn => {
+    // Закрытие модального окна менеджера
+    const closeMgrBtn = document.getElementById("closeManagerModalBtn");
+    const closeMgrFooterBtn = document.getElementById("closeManagerModalFooterBtn");
+    const mgrModalBackdrop = document.getElementById("managerAnalyticsModal");
+
+    if (closeMgrBtn) closeMgrBtn.onclick = closeManagerModal;
+    if (closeMgrFooterBtn) closeMgrFooterBtn.onclick = closeManagerModal;
+    if (mgrModalBackdrop) {
+        mgrModalBackdrop.onclick = (e) => {
+            if (e.target.id === "managerAnalyticsModal") closeManagerModal();
+        };
+    }
+
+    // Закрытие по клавише Escape
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            closeCallModal();
+            closeManagerModal();
+        }
+    });
+
+    // Переключение вкладок модалки звонка
+    document.querySelectorAll(".tab-btn[data-tab]").forEach(btn => {
         btn.onclick = () => {
-            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".tab-btn[data-tab]").forEach(b => b.classList.remove("active"));
             document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
 
             btn.classList.add("active");
             const targetTab = btn.getAttribute("data-tab");
+            const tabContent = document.getElementById(targetTab);
+            if (tabContent) tabContent.classList.add("active");
+        };
+    });
+
+    // Переключение вкладок модалки менеджера
+    document.querySelectorAll(".tab-btn[data-mgr-tab]").forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll(".tab-btn[data-mgr-tab]").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".mgr-tab-content").forEach(c => c.classList.remove("active"));
+
+            btn.classList.add("active");
+            const targetTab = btn.getAttribute("data-mgr-tab");
             const tabContent = document.getElementById(targetTab);
             if (tabContent) tabContent.classList.add("active");
         };

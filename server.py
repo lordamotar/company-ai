@@ -3,6 +3,12 @@ import sys
 import time
 import http.server
 import socketserver
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 from export_db_to_json import export_calls_to_json
 
 PORT = 8080
