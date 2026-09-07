@@ -10,6 +10,7 @@ version/
 *.wav
 *.mp3
 *.txt
+!requirements*.txt
 *.md
 .venv/
 .tech/
@@ -23,3 +24,6 @@ __pycache__/
 postgres/
 n8n_data/
 *.log
+frontend/*.json
+html/*.json
+

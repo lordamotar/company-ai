@@ -39,3 +39,31 @@ services:
 
     depends_on:
       - postgres
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: company-web
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=company
+      - DB_USER=company_user
+      - DB_PASSWORD=company_password
+      - TZ=Asia/Almaty
+    volumes:
+      - ./app:/app/app
+      - ./export_db_to_json.py:/app/export_db_to_json.py
+      - ./frontend:/app/frontend
+      - ./incoming:/app/incoming
+      - ./processed:/app/processed
+      - ./processing:/app/processing
+      - ./.tech:/app/.tech
+    depends_on:
+      - postgres

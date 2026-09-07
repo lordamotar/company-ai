@@ -6,11 +6,11 @@ import re
 from datetime import date, time, datetime
 
 DB_CONFIG = {
-    "host": "127.0.0.1",
-    "port": 5433,
-    "database": "company",
-    "user": "company_user",
-    "password": "company_password",
+    "host": os.getenv("DB_HOST", "127.0.0.1"),
+    "port": int(os.getenv("DB_PORT", "5433")),
+    "database": os.getenv("DB_NAME", "company"),
+    "user": os.getenv("DB_USER", "company_user"),
+    "password": os.getenv("DB_PASSWORD", "company_password"),
 }
 
 def default_serializer(obj):
@@ -74,7 +74,56 @@ def detect_tire_details(text):
     return brand_str, tire_size
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_OUTPUT_JSON = os.path.join(BASE_DIR, "html", "calls_data.json")
+DEFAULT_OUTPUT_JSON = os.path.join(BASE_DIR, "frontend", "calls_data.json")
+DEFAULT_AUDIT_JSON = os.path.join(BASE_DIR, "frontend", "audit_data.json")
+
+def export_audit_logs_to_json(output_file=DEFAULT_AUDIT_JSON):
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                l.id, l.call_id, l.field_name, l.old_value, l.new_value, 
+                l.changed_by, l.changed_at, l.comment,
+                t.phone, t.call_date, t.call_time, t.manager_name
+            FROM call_audit_logs l
+            LEFT JOIN call_transcriptions t ON l.call_id = t.id
+            ORDER BY l.id DESC;
+        """)
+        rows = cursor.fetchall()
+        logs = []
+        for r in rows:
+            changed_time = r[6].strftime("%d.%m.%Y %H:%M:%S") if r[6] else "—"
+            field_ru = "Менеджер" if r[2] == "manager_name" else ("Город / Филиал" if r[2] == "city_name" else r[2])
+            logs.append({
+                "id": r[0],
+                "callId": r[1],
+                "fieldName": r[2],
+                "fieldLabel": field_ru,
+                "oldValue": r[3] or "—",
+                "newValue": r[4] or "—",
+                "changedBy": r[5] or "Супервайзер",
+                "changedAt": changed_time,
+                "comment": r[7] or "Корректировка данных",
+                "phone": r[8] or "—",
+                "callDate": r[9].strftime("%d.%m.%Y") if r[9] else "—",
+                "callTime": r[10].strftime("%H:%M:%S") if r[10] else "—",
+                "currentManager": r[11] or "Оператор"
+            })
+
+        cursor.close()
+        conn.close()
+
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2, default=default_serializer)
+
+        logging.info(f"[+] Экспорт аудита в {output_file} завершен: {len(logs)} записей.")
+        return logs
+    except Exception as e:
+        logging.error(f"[!] Ошибка экспорта журнала аудита: {e}")
+        return []
 
 def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
     try:
@@ -84,7 +133,7 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
         cursor.execute("""
             SELECT 
                 t.id, t.unique_id, t.phone, t.call_date, t.call_time, 
-                t.text, t.source_file, t.status, t.manager_name, t.duration_sec,
+                t.text, t.source_file, t.status, t.manager_name, t.city_name, t.duration_sec,
                 af.mean_rms, af.max_rms, af.loud_moments_pct, af.silent_duration_sec, af.silence_pct, af.speech_tempo, af.active_speech_sec,
                 ae.dominant_emotion, ae.confidence as emotion_conf, ae.happy_score, ae.neutral_score, ae.sad_score, ae.angry_score,
                 cs.customer_sentiment_start, cs.customer_sentiment_end, cs.satisfaction_score, cs.manager_politeness, cs.conflict_detected, cs.conflict_reason, cs.tone_summary
@@ -107,27 +156,28 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
             source_file = r[6] or ""
             status = r[7] or "new"
             db_manager = r[8]
-            db_duration_sec = float(r[9]) if r[9] is not None else None
+            db_city = r[9]
+            db_duration_sec = float(r[10]) if r[10] is not None else None
 
-            mean_rms = float(r[10]) if r[10] is not None else 0.04
-            max_rms = float(r[11]) if r[11] is not None else 0.2
-            loud_pct = float(r[12]) if r[12] is not None else 0.0
-            silence_sec = float(r[13]) if r[13] is not None else 0.0
-            silence_pct = float(r[14]) if r[14] is not None else 20.0
-            speech_tempo = float(r[15]) if r[15] is not None else 130.0
-            active_sec = float(r[16]) if r[16] is not None else 0.0
+            mean_rms = float(r[11]) if r[11] is not None else 0.04
+            max_rms = float(r[12]) if r[12] is not None else 0.2
+            loud_pct = float(r[13]) if r[13] is not None else 0.0
+            silence_sec = float(r[14]) if r[14] is not None else 0.0
+            silence_pct = float(r[15]) if r[15] is not None else 20.0
+            speech_tempo = float(r[16]) if r[16] is not None else 130.0
+            active_sec = float(r[17]) if r[17] is not None else 0.0
 
-            dominant_emotion = r[17] or "Радость"
-            emotion_conf = float(r[18]) if r[18] is not None else 75.0
-            happy_score = float(r[19]) if r[19] is not None else 70.0
-            neutral_score = float(r[20]) if r[20] is not None else 20.0
-            sad_score = float(r[21]) if r[21] is not None else 10.0
-            angry_score = float(r[22]) if r[22] is not None else 0.0
+            dominant_emotion = r[18] or "Радость"
+            emotion_conf = float(r[19]) if r[19] is not None else 75.0
+            happy_score = float(r[20]) if r[20] is not None else 70.0
+            neutral_score = float(r[21]) if r[21] is not None else 20.0
+            sad_score = float(r[22]) if r[22] is not None else 10.0
+            angry_score = float(r[23]) if r[23] is not None else 0.0
 
-            csat = int(r[25]) if r[25] is not None else 5
-            manager_politeness = int(r[26]) if r[26] is not None else 5
-            conflict = bool(r[27]) if r[27] is not None else False
-            summary = r[29] if len(r) > 29 and r[29] else (raw_text[:200] + "..." if raw_text else "Транскрипция звонка.")
+            csat = int(r[26]) if r[26] is not None else 5
+            manager_politeness = int(r[27]) if r[27] is not None else 5
+            conflict = bool(r[28]) if r[28] is not None else False
+            summary = r[30] if len(r) > 30 and r[30] else (raw_text[:200] + "..." if raw_text else "Транскрипция звонка.")
 
             emotion_class = "happy"
             if dominant_emotion in ["Нейтральный", "neu", "neutral"]:
@@ -190,7 +240,7 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
                     })
 
             manager_name = db_manager if db_manager else detect_manager_name(raw_text)
-            city_name = detect_city(raw_text)
+            city_name = db_city if db_city else detect_city(raw_text)
             brand_name, tire_size_str = detect_tire_details(raw_text)
             topic_str = f"{brand_name} {tire_size_str}" if brand_name else "Консультация по шинам"
 
@@ -209,16 +259,23 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
             direction = "out" if is_outgoing else "in"
             direction_label = "Исходящий звонок" if is_outgoing else "Входящий звонок"
 
-            greet_passed = (manager_name != "Оператор") or ("эйкос" in raw_text.lower())
-            needs_passed = ("размер" in raw_text.lower()) or ("зимн" in raw_text.lower()) or (tire_size_str != "205/55 R16")
-            city_passed = (city_name != "")
-            upsell_passed = ("хранени" in raw_text.lower()) or ("монтаж" in raw_text.lower()) or ("гаранти" in raw_text.lower())
+            # 7 показателей чек-листа скрипта
+            greet_passed = (manager_name != "Оператор") or ("эйкос" in raw_text.lower()) or ("здравствуйт" in raw_text.lower()) or ("добрый" in raw_text.lower())
+            needs_passed = ("размер" in raw_text.lower()) or ("зимн" in raw_text.lower()) or ("летн" in raw_text.lower()) or (tire_size_str != "205/55 R16") or ("радиус" in raw_text.lower())
+            present_passed = ("шин" in raw_text.lower() or "колес" in raw_text.lower() or "комплект" in raw_text.lower()) and ("тенге" in raw_text.lower() or "стоит" in raw_text.lower() or "цена" in raw_text.lower() or "тысяч" in raw_text.lower() or brand_name != "—")
+            objection_passed = (not conflict) or ("предлож" in raw_text.lower() or "склад" in raw_text.lower() or "филиал" in raw_text.lower() or "вариант" in raw_text.lower() or "можем" in raw_text.lower())
+            closing_passed = ("до свидан" in raw_text.lower() or "всего добр" in raw_text.lower() or "хорошего" in raw_text.lower() or "бронь" in raw_text.lower() or "заказ" in raw_text.lower() or "приезжайте" in raw_text.lower() or "ждем" in raw_text.lower() or city_name != "")
+            prof_passed = (manager_politeness >= 4) and (angry_score <= 10)
+            upsell_passed = ("хранени" in raw_text.lower()) or ("монтаж" in raw_text.lower()) or ("гаранти" in raw_text.lower()) or ("балансировк" in raw_text.lower())
             
             checklist = [
-                { "title": "Приветствие и имя компании", "desc": f"Представился: «Компания Эйкос, {manager_name}»" if greet_passed else "Не назвал компанию/имя", "passed": greet_passed },
-                { "title": "Выявление потребности и размера", "desc": f"Уточнил параметры: {tire_size_str}" if needs_passed else "Потребность не уточнена", "passed": needs_passed },
-                { "title": "Уточнение города и наличия", "desc": f"Филиал: город {city_name}" if city_passed else "Город не уточнен", "passed": city_passed },
-                { "title": "Допродажа сопутствующих услуг", "desc": "Предложил сезонное хранение / шиномонтаж" if upsell_passed else "Не предложено сезонное хранение шин", "passed": upsell_passed }
+                { "title": "Приветствие", "desc": f"Представился: «Компания Эйкос, {manager_name}»" if greet_passed else "Не назвал компанию / не представился", "passed": greet_passed },
+                { "title": "Выявления потребностей", "desc": f"Уточнил параметры и типоразмер: {tire_size_str}" if needs_passed else "Потребность и типоразмер не уточнены", "passed": needs_passed },
+                { "title": "Презентация", "desc": f"Презентовал варианты шин ({brand_name}), озвучил стоимость" if present_passed else "Презентация вариантов шин не проведена", "passed": present_passed },
+                { "title": "Работа с возражениями", "desc": "Отработал вопросы и сомнения по наличию/складу, предложил альтернативы" if objection_passed else "Не отработаны сомнения/претензия клиента", "passed": objection_passed },
+                { "title": "Окончание разговора", "desc": f"Зафиксировал договоренность (город {city_name or 'Алматы'}), вежливо попрощался" if closing_passed else "Не зафиксирован итог / нет вежливого прощания", "passed": closing_passed },
+                { "title": "Профессиональный подход", "desc": f"Оценка вежливости {manager_politeness}/5, соблюдение делового этикета" if prof_passed else "Зафиксированы замечания к культуре речи", "passed": prof_passed },
+                { "title": "Доп прдажа", "desc": "Предложил сопутствующие услуги (хранение шин / шиномонтаж)" if upsell_passed else "Не предложены сопутствующие услуги (хранение/монтаж)", "passed": upsell_passed }
             ]
 
             script_score = int((sum(1 for i in checklist if i["passed"]) / len(checklist)) * 100)
@@ -245,8 +302,8 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
             client_neutral_pct = max(100 - client_happy_pct - (15 if client_neg > 0 else 5), 0)
             client_sad_pct = 100 - client_happy_pct - client_neutral_pct
 
-            cust_start = r[23] if len(r) > 23 and r[23] else "Нейтральный"
-            cust_end = r[24] if len(r) > 24 and r[24] else ("Позитивный" if csat >= 4 else "Нейтральный")
+            cust_start = str(r[24]) if len(r) > 24 and r[24] is not None else "Нейтральный"
+            cust_end = str(r[25]) if len(r) > 25 and r[25] is not None else ("Позитивный" if csat >= 4 else "Нейтральный")
 
             calls.append({
                 "id": call_id,
@@ -275,6 +332,7 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
                 "statusClass": "badge-success",
                 "managerPoliteness": f"{manager_politeness} / 5",
                 "conflict": conflict,
+                "conflictReason": r[29] if len(r) > 29 and r[29] else ("Клиент выразил недовольство условиями" if conflict else None),
                 "summary": summary,
                 "opportunity": "Предложить сезонное хранение шин и расширенную гарантию." if not upsell_passed else "Все допродажи выполнены успешно.",
                 "emotionsDist": {
@@ -323,6 +381,13 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
             json.dump(calls, f, ensure_ascii=False, indent=2, default=default_serializer)
 
         logging.info(f"[+] Экспорт в {output_file} завершен: {len(calls)} звонков выгружено.")
+        
+        # Экспортируем также журнал аудита
+        try:
+            export_audit_logs_to_json()
+        except Exception as err:
+            logging.warning(f"Не удалось обновить журнал аудита: {err}")
+
         return calls
     except Exception as e:
         logging.error(f"[!] Ошибка экспорта звонков в JSON: {e}")
@@ -330,3 +395,4 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
 
 if __name__ == "__main__":
     export_calls_to_json()
+    export_audit_logs_to_json()

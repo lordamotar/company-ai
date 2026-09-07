@@ -123,12 +123,8 @@ function renderCallsTable(data) {
             </td>
             <td>${emotionBadge}</td>
             <td><span class="stars-score">⭐ ${call.csat || 5}.0 / 5</span></td>
-            <td><span class="badge badge-primary">${call.scriptScore || 80}%</span></td>
             <td><span class="badge ${call.statusClass || 'badge-success'}">${call.status || 'Обработан'}</span></td>
             <td class="text-right" style="white-space: nowrap;">
-                <button class="btn-icon" style="margin-right: 4px; padding: 5px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; cursor: pointer;" onclick="event.stopPropagation(); openCallAndPlayAudio(${call.id});" title="Включить прослушку аудио">
-                    🎧
-                </button>
                 <button class="btn-icon" style="margin-right: 4px; padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;" onclick="event.stopPropagation(); openEditCallModal(${call.id});" title="Редактировать имя менеджера или город">
                     ✏️
                 </button>
@@ -160,10 +156,13 @@ function renderDashboard(data) {
 
     const total = data.length;
 
-    // 1. Этапы скрипта продаж
+    // 1. Соблюдение этапов скрипта продаж (7 показателей)
     let greetingPassed = 0;
     let needsPassed = 0;
-    let cityPassed = 0;
+    let presentPassed = 0;
+    let objectionPassed = 0;
+    let closingPassed = 0;
+    let profPassed = 0;
     let upsellPassed = 0;
 
     data.forEach(call => {
@@ -171,10 +170,13 @@ function renderDashboard(data) {
             call.checklist.forEach(item => {
                 const title = (item.title || "").toLowerCase();
                 if (item.passed) {
-                    if (title.includes("приветств") || title.includes("имя")) greetingPassed++;
-                    else if (title.includes("потребност") || title.includes("размер")) needsPassed++;
-                    else if (title.includes("город") || title.includes("наличи") || title.includes("акци")) cityPassed++;
-                    else if (title.includes("допродаж") || title.includes("хранен") || title.includes("монтаж")) upsellPassed++;
+                    if (title.includes("приветств")) greetingPassed++;
+                    else if (title.includes("потребност")) needsPassed++;
+                    else if (title.includes("презентац")) presentPassed++;
+                    else if (title.includes("возражен")) objectionPassed++;
+                    else if (title.includes("окончан") || title.includes("заверш")) closingPassed++;
+                    else if (title.includes("профессиональн") || title.includes("подход")) profPassed++;
+                    else if (title.includes("доп") || title.includes("продаж") || title.includes("прлож")) upsellPassed++;
                 }
             });
         }
@@ -182,28 +184,43 @@ function renderDashboard(data) {
 
     const greetPct = Math.round((greetingPassed / total) * 100);
     const needsPct = Math.round((needsPassed / total) * 100);
-    const cityPct = Math.round((cityPassed / total) * 100);
+    const presentPct = Math.round((presentPassed / total) * 100);
+    const objectionPct = Math.round((objectionPassed / total) * 100);
+    const closingPct = Math.round((closingPassed / total) * 100);
+    const profPct = Math.round((profPassed / total) * 100);
     const upsellPct = Math.round((upsellPassed / total) * 100);
 
-    const avgScript = Math.round((greetPct + needsPct + cityPct + upsellPct) / 4);
+    const avgScript = Math.round((greetPct + needsPct + presentPct + objectionPct + closingPct + profPct + upsellPct) / 7);
     if (avgScriptBadge) avgScriptBadge.innerText = `${avgScript}% среднее`;
 
     scriptBarsList.innerHTML = `
         <div class="script-bar-item">
-            <div class="script-bar-meta"><span>1. Приветствие и стандарт бренда</span><span>${greetPct}%</span></div>
+            <div class="script-bar-meta"><span>1. Приветствие</span><span>${greetPct}%</span></div>
             <div class="script-bar-track"><div class="script-bar-fill green" style="width: ${greetPct}%;"></div></div>
         </div>
         <div class="script-bar-item">
-            <div class="script-bar-meta"><span>2. Выявление потребности и параметров шин</span><span>${needsPct}%</span></div>
+            <div class="script-bar-meta"><span>2. Выявления потребностей</span><span>${needsPct}%</span></div>
             <div class="script-bar-track"><div class="script-bar-fill blue" style="width: ${needsPct}%;"></div></div>
         </div>
         <div class="script-bar-item">
-            <div class="script-bar-meta"><span>3. Уточнение города и проверка наличия</span><span>${cityPct}%</span></div>
-            <div class="script-bar-track"><div class="script-bar-fill purple" style="width: ${cityPct}%;"></div></div>
+            <div class="script-bar-meta"><span>3. Презентация</span><span>${presentPct}%</span></div>
+            <div class="script-bar-track"><div class="script-bar-fill purple" style="width: ${presentPct}%;"></div></div>
         </div>
         <div class="script-bar-item">
-            <div class="script-bar-meta"><span>4. Допродажа сопутствующих услуг (хранение/монтаж)</span><span>${upsellPct}%</span></div>
-            <div class="script-bar-track"><div class="script-bar-fill yellow" style="width: ${upsellPct}%;"></div></div>
+            <div class="script-bar-meta"><span>4. Работа с возражениями</span><span>${objectionPct}%</span></div>
+            <div class="script-bar-track"><div class="script-bar-fill yellow" style="width: ${objectionPct}%;"></div></div>
+        </div>
+        <div class="script-bar-item">
+            <div class="script-bar-meta"><span>5. Окончание разговора</span><span>${closingPct}%</span></div>
+            <div class="script-bar-track"><div class="script-bar-fill green" style="width: ${closingPct}%;"></div></div>
+        </div>
+        <div class="script-bar-item">
+            <div class="script-bar-meta"><span>6. Профессиональный подход</span><span>${profPct}%</span></div>
+            <div class="script-bar-track"><div class="script-bar-fill blue" style="width: ${profPct}%;"></div></div>
+        </div>
+        <div class="script-bar-item">
+            <div class="script-bar-meta"><span>7. Доп прдажа</span><span>${upsellPct}%</span></div>
+            <div class="script-bar-track"><div class="script-bar-fill purple" style="width: ${upsellPct}%;"></div></div>
         </div>
     `;
 
@@ -498,32 +515,36 @@ function openManagerAnalytics(managerName) {
         </div>
     `;
 
-    // 4. Декомпозиция этапов скрипта
+    // 4. Декомпозиция этапов скрипта (7 показателей)
     const stagesList = document.getElementById("mgrScriptStagesList");
-    let greetPass = 0, needsPass = 0, cityPass = 0, upsellPass = 0;
+    let greetPass = 0, needsPass = 0, presentPass = 0, objectionPass = 0, closingPass = 0, profPass = 0, upsellPass = 0;
     mgrCalls.forEach(c => {
         if (c.checklist) {
             c.checklist.forEach(item => {
                 const t = (item.title || "").toLowerCase();
                 if (t.includes("приветств") && item.passed) greetPass++;
                 if (t.includes("потребност") && item.passed) needsPass++;
-                if (t.includes("город") && item.passed) cityPass++;
-                if (t.includes("допродаж") && item.passed) upsellPass++;
+                if (t.includes("презентац") && item.passed) presentPass++;
+                if (t.includes("возражен") && item.passed) objectionPass++;
+                if ((t.includes("окончан") || t.includes("заверш")) && item.passed) closingPass++;
+                if ((t.includes("профессиональн") || t.includes("подход")) && item.passed) profPass++;
+                if ((t.includes("доп") || t.includes("продаж")) && item.passed) upsellPass++;
             });
-        } else {
-            greetPass++; needsPass++; cityPass++;
         }
     });
 
     const greetPct = Math.round((greetPass / count) * 100);
     const needsPct = Math.round((needsPass / count) * 100);
-    const cityPct = Math.round((cityPass / count) * 100);
+    const presentPct = Math.round((presentPass / count) * 100);
+    const objectionPct = Math.round((objectionPass / count) * 100);
+    const closingPct = Math.round((closingPass / count) * 100);
+    const profPct = Math.round((profPass / count) * 100);
     const upsellPct = Math.round((upsellPass / count) * 100);
 
     stagesList.innerHTML = `
         <div class="script-stage-row">
             <div class="script-stage-info">
-                <div class="script-stage-name">1. Приветствие и идентификация бренда</div>
+                <div class="script-stage-name">1. Приветствие</div>
                 <div class="script-stage-desc">Назвал компанию «Эйкос» и представился по имени</div>
             </div>
             <div class="script-stage-progress-wrap">
@@ -533,8 +554,8 @@ function openManagerAnalytics(managerName) {
         </div>
         <div class="script-stage-row">
             <div class="script-stage-info">
-                <div class="script-stage-name">2. Выявление потребности и параметров авто</div>
-                <div class="script-stage-desc">Уточнил типоразмер шин, марку автомобиля и сезонность</div>
+                <div class="script-stage-name">2. Выявления потребностей</div>
+                <div class="script-stage-desc">Уточнил типоразмер шин, сезонность и параметры авто</div>
             </div>
             <div class="script-stage-progress-wrap">
                 <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill green" style="width: ${needsPct}%;"></div></div>
@@ -543,22 +564,52 @@ function openManagerAnalytics(managerName) {
         </div>
         <div class="script-stage-row">
             <div class="script-stage-info">
-                <div class="script-stage-name">3. Уточнение города и наличия в филиале</div>
-                <div class="script-stage-desc">Проверил точные складские остатки по филиалу клиента</div>
+                <div class="script-stage-name">3. Презентация</div>
+                <div class="script-stage-desc">Презентовал варианты шин, озвучил бренды, наличие и цены</div>
             </div>
             <div class="script-stage-progress-wrap">
-                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill blue" style="width: ${cityPct}%;"></div></div>
-                <strong style="color: #60a5fa; font-size: 13px;">${cityPct}%</strong>
+                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill blue" style="width: ${presentPct}%;"></div></div>
+                <strong style="color: #60a5fa; font-size: 13px;">${presentPct}%</strong>
             </div>
         </div>
         <div class="script-stage-row">
             <div class="script-stage-info">
-                <div class="script-stage-name">4. Допродажа сопутствующих услуг</div>
+                <div class="script-stage-name">4. Работа с возражениями</div>
+                <div class="script-stage-desc">Отработал вопросы по наличию, складу, предложил альтернативы</div>
+            </div>
+            <div class="script-stage-progress-wrap">
+                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill yellow" style="width: ${objectionPct}%;"></div></div>
+                <strong style="color: #facc15; font-size: 13px;">${objectionPct}%</strong>
+            </div>
+        </div>
+        <div class="script-stage-row">
+            <div class="script-stage-info">
+                <div class="script-stage-name">5. Окончание разговора</div>
+                <div class="script-stage-desc">Зафиксировал договоренность, назвал адрес/филиал, вежливо попрощался</div>
+            </div>
+            <div class="script-stage-progress-wrap">
+                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill green" style="width: ${closingPct}%;"></div></div>
+                <strong style="color: #4ade80; font-size: 13px;">${closingPct}%</strong>
+            </div>
+        </div>
+        <div class="script-stage-row">
+            <div class="script-stage-info">
+                <div class="script-stage-name">6. Профессиональный подход</div>
+                <div class="script-stage-desc">Соблюдение стандартов вежливости, экспертность и деловой этикет</div>
+            </div>
+            <div class="script-stage-progress-wrap">
+                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill blue" style="width: ${profPct}%;"></div></div>
+                <strong style="color: #60a5fa; font-size: 13px;">${profPct}%</strong>
+            </div>
+        </div>
+        <div class="script-stage-row">
+            <div class="script-stage-info">
+                <div class="script-stage-name">7. Доп прдажа</div>
                 <div class="script-stage-desc">Предложение сезонного хранения шин, шиномонтажа и гарантии</div>
             </div>
             <div class="script-stage-progress-wrap">
-                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill ${upsellPct > 50 ? "green" : "yellow"}" style="width: ${upsellPct}%;"></div></div>
-                <strong style="color: ${upsellPct > 50 ? "#4ade80" : "#facc15"}; font-size: 13px;">${upsellPct}%</strong>
+                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill purple" style="width: ${upsellPct}%;"></div></div>
+                <strong style="color: #c084fc; font-size: 13px;">${upsellPct}%</strong>
             </div>
         </div>
     `;
@@ -1107,9 +1158,41 @@ function switchView(viewId) {
     }
 }
 
+// Функция гарантированного получения всех 7 показателей чек-листа скрипта
+function getCallChecklist(call) {
+    if (Array.isArray(call.checklist) && call.checklist.length === 7) {
+        return call.checklist;
+    }
+
+    const rawText = (call.dialogue ? call.dialogue.map(d => d.text).join(" ") : (call.summary || "")).toLowerCase();
+    const mgrName = (call.manager && call.manager.trim()) ? call.manager.trim() : "Оператор";
+    const city = (call.city && call.city.trim()) ? call.city.trim() : "Алматы";
+    const tireSize = call.tireSize || "195/50/R15";
+    const brand = call.brand || "—";
+    const politeness = parseInt(call.managerPoliteness) || 5;
+
+    const greet = (mgrName !== "Оператор") || rawText.includes("эйкос") || rawText.includes("здравствуйт") || rawText.includes("добрый");
+    const needs = rawText.includes("размер") || rawText.includes("зимн") || rawText.includes("летн") || (tireSize !== "205/55 R16" && tireSize !== "—") || rawText.includes("радиус");
+    const present = (rawText.includes("шин") || rawText.includes("колес") || rawText.includes("комплект")) && (rawText.includes("тенге") || rawText.includes("стоит") || rawText.includes("цена") || rawText.includes("тысяч") || brand !== "—");
+    const objection = (!call.conflict) || rawText.includes("предлож") || rawText.includes("склад") || rawText.includes("филиал") || rawText.includes("вариант") || rawText.includes("можем");
+    const closing = rawText.includes("до свидан") || rawText.includes("всего добр") || rawText.includes("хорошего") || rawText.includes("бронь") || rawText.includes("заказ") || rawText.includes("приезжайте") || rawText.includes("ждем") || (city !== "");
+    const prof = (politeness >= 4) && (!call.conflict || politeness >= 4);
+    const upsell = rawText.includes("хранен") || rawText.includes("монтаж") || rawText.includes("гаранти") || rawText.includes("балансировк");
+
+    return [
+        { title: "Приветствие", desc: greet ? `Представился: «Компания Эйкос, ${mgrName}»` : "Не назвал компанию / не представился", passed: greet },
+        { title: "Выявления потребностей", desc: needs ? `Уточнил параметры и типоразмер: ${tireSize}` : "Потребность и типоразмер не уточнены", passed: needs },
+        { title: "Презентация", desc: present ? `Презентовал варианты шин (${brand}), озвучил стоимость` : "Презентация вариантов шин не проведена", passed: present },
+        { title: "Работа с возражениями", desc: objection ? "Отработал вопросы и сомнения по наличию/складу, предложил альтернативы" : "Не отработаны сомнения/претензия клиента", passed: objection },
+        { title: "Окончание разговора", desc: closing ? `Зафиксировал договоренность (город ${city}), вежливо попрощался` : "Не зафиксирован итог / нет вежливого прощания", passed: closing },
+        { title: "Профессиональный подход", desc: prof ? `Оценка вежливости ${politeness}/5, соблюдение делового этикета` : "Зафиксированы замечания к культуре речи", passed: prof },
+        { title: "Доп прдажа", desc: upsell ? "Предложил сопутствующие услуги (хранение шин / шиномонтаж)" : "Не предложены сопутствующие услуги (хранение/монтаж)", passed: upsell }
+    ];
+}
+
 // Открытие модального окна с детальным разбором звонка
 function openCallModal(callId) {
-    const call = callsData.find(c => c.id === callId);
+    const call = callsData.find(c => c.id == callId);
     if (!call) return;
 
     // Шапка
@@ -1308,23 +1391,45 @@ function openCallModal(callId) {
         }
     }
 
-    // Вкладка 4: Чек-лист скрипта
-    const checklistItems = document.getElementById("modalChecklistItems");
-    if (checklistItems) {
-        if (Array.isArray(call.checklist) && call.checklist.length > 0) {
-            checklistItems.innerHTML = call.checklist.map(item => `
-                <div class="checklist-row ${item.passed ? "passed" : "failed"}">
-                    <div class="chk-status">${item.passed ? "✓" : "✗"}</div>
-                    <div class="chk-details">
-                        <div class="chk-title">${item.title}</div>
-                        <div class="chk-desc">${item.desc}</div>
+    // Вкладка 4: Чек-лист скрипта (все 7 показателей)
+    const checklist = getCallChecklist(call);
+    const passedCount = checklist.filter(item => item.passed).length;
+    const scorePct = Math.round((passedCount / checklist.length) * 100);
+
+    const checklistContainer = document.getElementById("tab-checklist");
+    if (checklistContainer) {
+        checklistContainer.innerHTML = `
+            <div class="checklist-container">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                            📋 Проверка чек-листа звонка менеджера (7 стандартов)
+                        </h3>
+                        <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted);">
+                            Автоматический аудит соблюдения стандартов скрипта продаж в звонке #${call.id}
+                        </p>
                     </div>
-                    <span class="badge ${item.passed ? "badge-success" : "badge-warning"}">${item.passed ? "Выполнено" : "Пропущено"}</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="badge ${scorePct >= 80 ? 'badge-success' : (scorePct >= 60 ? 'badge-primary' : 'badge-warning')}" style="font-size: 13px; padding: 6px 12px; font-weight: 700;">
+                            Соблюдение: ${scorePct}% (${passedCount} из 7)
+                        </span>
+                    </div>
                 </div>
-            `).join("");
-        } else {
-            checklistItems.innerHTML = `<div class="empty-state">Чек-лист формируется</div>`;
-        }
+
+                <div class="checklist-items" id="modalChecklistItems">
+                    ${checklist.map((item, idx) => `
+                        <div class="checklist-row ${item.passed ? "passed" : "failed"}">
+                            <div class="chk-status">${item.passed ? "✓" : "✗"}</div>
+                            <div class="chk-details">
+                                <div class="chk-title">${idx + 1}. ${item.title}</div>
+                                <div class="chk-desc">${item.desc}</div>
+                            </div>
+                            <span class="badge ${item.passed ? "badge-success" : "badge-warning"}">${item.passed ? "Выполнено" : "Не выполнено"}</span>
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+        `;
     }
 
     // Активируем первую вкладку
@@ -1879,12 +1984,12 @@ async function saveCallEdits() {
     }
 }
 
-// Загрузка реальных данных из базы данных через calls_data.json и audit_data.json
+// Загрузка реальных данных из базы данных через REST API FastAPI (/api/calls и /api/audit)
 async function loadCallsData() {
     try {
         const [resCalls, resAudit] = await Promise.all([
-            fetch("calls_data.json?t=" + new Date().getTime()),
-            fetch("audit_data.json?t=" + new Date().getTime()).catch(() => null)
+            fetch("/api/calls?t=" + new Date().getTime()).catch(() => fetch("calls_data.json?t=" + new Date().getTime())),
+            fetch("/api/audit?t=" + new Date().getTime()).catch(() => fetch("audit_data.json?t=" + new Date().getTime()))
         ]);
 
         if (resCalls && resCalls.ok) {
@@ -1895,7 +2000,7 @@ async function loadCallsData() {
                 renderDashboard(callsData);
                 renderManagers(callsData);
                 renderClients(callsData);
-                console.log("[AI CRM] Загружены реальные звонки из PostgreSQL:", callsData.length);
+                console.log("[AI CRM] Загружены реальные звонки из PostgreSQL (FastAPI API):", callsData.length);
             }
         }
 

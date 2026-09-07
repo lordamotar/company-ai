@@ -6,6 +6,11 @@ import logging
 import sys
 from datetime import datetime, timezone
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 import psycopg2
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -21,7 +26,7 @@ INCOMING_DIR = os.path.join(BASE_DIR, "incoming")
 PROCESSING_DIR = os.path.join(BASE_DIR, "processing")
 PROCESSED_DIR = os.path.join(BASE_DIR, "processed")
 ERROR_DIR = os.path.join(BASE_DIR, "error")
-TRANSCRIPTIONS_DIR = os.path.join(BASE_DIR, "transcriptions")
+TRANSCRIPTIONS_DIR = os .path.join(BASE_DIR, "transcriptions")
 
 # Настройка логирования
 logging.basicConfig(
@@ -34,11 +39,11 @@ logging.basicConfig(
 )
 
 DB_CONFIG = {
-    "host": "127.0.0.1",
-    "port": 5433,
-    "database": "company",
-    "user": "company_user",
-    "password": "company_password",
+    "host": os.getenv("DB_HOST", "127.0.0.1"),
+    "port": int(os.getenv("DB_PORT", "5433")),
+    "database": os.getenv("DB_NAME", "company"),
+    "user": os.getenv("DB_USER", "company_user"),
+    "password": os.getenv("DB_PASSWORD", "company_password"),
 }
 
 
@@ -263,14 +268,15 @@ def transcribe_with_gemini(file_path, output_txt_path=None):
     logging.info(f"Файл {filename} загружен в Gemini API. Имя объекта: {audio_file.name}")
 
     prompt = (
-        "Сделай дословную и максимально качественную транскрипцию этого телефонного разговора на русском языке. "
+        "Сделай точную построчную транскрипцию этого телефонного разговора. "
+        "Язык разговора может быть казахским, русским или смешанным (казахский + русский). "
         "Обязательно раздели диалог на реплики Менеджера и Клиента:\n"
         "**Менеджер:** <реплика>\n"
         "**Клиент:** <реплика>\n"
-        "Не добавляй вступительных слов и пояснений от себя, верни только диалог."
+        "Пиши точно на том языке, на котором говорят участники (казахский/русский), не переводи и не добавляй вводных слов от себя, верни только диалог."
     )
 
-    models_to_try = ["gemini-3.6-flash", "gemini-2.5-flash"]
+    models_to_try = ["gemini-2.5-flash", "gemini-1.5-flash"]
     text = None
 
     for model_name in models_to_try:

@@ -1,0 +1,13 @@
+.venv
+.git
+.agents
+__pycache__
+*.pyc
+*.log
+postgres
+n8n_data
+incoming
+processed
+processing
+.tech
+transcriptions
