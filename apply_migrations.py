@@ -1,12 +1,13 @@
-import psycopg2
+import os
 import sys
+import psycopg2
 
 DB_CONFIG = {
-    "host": "127.0.0.1",
-    "port": 5433,
-    "database": "company",
-    "user": "company_user",
-    "password": "company_password",
+    "host": os.getenv("DB_HOST", "127.0.0.1"),
+    "port": int(os.getenv("DB_PORT", "5433")),
+    "database": os.getenv("DB_NAME", "company"),
+    "user": os.getenv("DB_USER", "company_user"),
+    "password": os.getenv("DB_PASSWORD", "company_password"),
 }
 
 def apply_migration(sql_file="init_tone_tables.sql"):

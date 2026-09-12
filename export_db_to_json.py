@@ -77,7 +77,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_OUTPUT_JSON = os.path.join(BASE_DIR, "frontend", "calls_data.json")
 DEFAULT_AUDIT_JSON = os.path.join(BASE_DIR, "frontend", "audit_data.json")
 
-def export_audit_logs_to_json(output_file=DEFAULT_AUDIT_JSON):
+def export_audit_logs_to_json(output_file=DEFAULT_AUDIT_JSON, write_to_file=True):
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
@@ -115,17 +115,17 @@ def export_audit_logs_to_json(output_file=DEFAULT_AUDIT_JSON):
         cursor.close()
         conn.close()
 
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(logs, f, ensure_ascii=False, indent=2, default=default_serializer)
-
-        logging.info(f"[+] Экспорт аудита в {output_file} завершен: {len(logs)} записей.")
+        if write_to_file and output_file:
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(logs, f, ensure_ascii=False, indent=2, default=default_serializer)
+            logging.info(f"[+] Экспорт аудита в {output_file} завершен: {len(logs)} записей.")
         return logs
     except Exception as e:
         logging.error(f"[!] Ошибка экспорта журнала аудита: {e}")
         return []
 
-def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
+def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
@@ -376,17 +376,17 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON):
         cursor.close()
         conn.close()
 
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(calls, f, ensure_ascii=False, indent=2, default=default_serializer)
+        if write_to_file and output_file:
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(calls, f, ensure_ascii=False, indent=2, default=default_serializer)
+            logging.info(f"[+] Экспорт в {output_file} завершен: {len(calls)} звонков выгружено.")
 
-        logging.info(f"[+] Экспорт в {output_file} завершен: {len(calls)} звонков выгружено.")
-        
-        # Экспортируем также журнал аудита
-        try:
-            export_audit_logs_to_json()
-        except Exception as err:
-            logging.warning(f"Не удалось обновить журнал аудита: {err}")
+            # Экспортируем также журнал аудита
+            try:
+                export_audit_logs_to_json(write_to_file=True)
+            except Exception as err:
+                logging.warning(f"Не удалось обновить журнал аудита: {err}")
 
         return calls
     except Exception as e:

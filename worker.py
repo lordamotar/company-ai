@@ -16,11 +16,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 
-# Использовать C:\company-ai, если она существует, иначе локальную папку проекта
-if os.path.exists(r"C:\Workspace\aikos.kz\company-ai\incoming"):
-    BASE_DIR = r"C:\Workspace\aikos.kz\company-ai"
-else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.getenv("BASE_DIR", os.path.dirname(os.path.abspath(__file__)))
 
 INCOMING_DIR = os.path.join(BASE_DIR, "incoming")
 PROCESSING_DIR = os.path.join(BASE_DIR, "processing")

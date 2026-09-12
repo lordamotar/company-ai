@@ -16,6 +16,7 @@ version/
 .tech/
 incoming/
 processed/
+dialog/
 .env
 test/
 __pycache__/
@@ -26,4 +27,4 @@ n8n_data/
 *.log
 frontend/*.json
 html/*.json
-
+call/

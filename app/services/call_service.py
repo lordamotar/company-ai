@@ -8,7 +8,7 @@ from export_db_to_json import export_calls_to_json, export_audit_logs_to_json
 def get_all_calls() -> List[dict]:
     """Возвращает список всех звонков с расширенной аналитикой."""
     try:
-        calls = export_calls_to_json()
+        calls = export_calls_to_json(write_to_file=False)
         return calls
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка загрузки звонков из БД: {e}")
@@ -24,7 +24,7 @@ def get_call_by_id(call_id: int) -> dict:
 def get_all_audit_logs() -> List[dict]:
     """Возвращает журнал аудита всех ручных изменений."""
     try:
-        logs = export_audit_logs_to_json()
+        logs = export_audit_logs_to_json(write_to_file=False)
         return logs
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка загрузки журнала аудита: {e}")
