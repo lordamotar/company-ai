@@ -294,13 +294,18 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             client_neu = sum(1 for d in client_lines if d.get("sentiment") == "neutral")
             client_neg = sum(1 for d in client_lines if d.get("sentiment") == "negative")
 
-            mgr_happy_pct = max(round((mgr_pos / mgr_total) * 100), 70 if manager_politeness >= 4 else 50)
-            mgr_neutral_pct = max(100 - mgr_happy_pct - (10 if mgr_neg > 0 else 0), 0)
-            mgr_sad_pct = 100 - mgr_happy_pct - mgr_neutral_pct
+            if conflict:
+                client_sad_pct = max(round((client_neg / client_total) * 100), 25)
+                client_happy_pct = min(round((client_pos / client_total) * 100), 40)
+                client_neutral_pct = max(100 - client_happy_pct - client_sad_pct, 0)
+            else:
+                client_sad_pct = min(round((client_neg / client_total) * 100), 5 if csat >= 4 else 15)
+                client_happy_pct = max(round((client_pos / client_total) * 100), 75 if csat >= 4 else 45)
+                client_neutral_pct = max(100 - client_happy_pct - client_sad_pct, 0)
 
-            client_happy_pct = max(round((client_pos / client_total) * 100), 75 if csat >= 4 else 40)
-            client_neutral_pct = max(100 - client_happy_pct - (15 if client_neg > 0 else 5), 0)
-            client_sad_pct = 100 - client_happy_pct - client_neutral_pct
+            mgr_sad_pct = min(round((mgr_neg / mgr_total) * 100), 5 if manager_politeness >= 4 else 15)
+            mgr_happy_pct = max(round((mgr_pos / mgr_total) * 100), 70 if manager_politeness >= 4 else 50)
+            mgr_neutral_pct = max(100 - mgr_happy_pct - mgr_sad_pct, 0)
 
             cust_start = str(r[24]) if len(r) > 24 and r[24] is not None else "Нейтральный"
             cust_end = str(r[25]) if len(r) > 25 and r[25] is not None else ("Позитивный" if csat >= 4 else "Нейтральный")

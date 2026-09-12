@@ -260,7 +260,30 @@ def transcribe_with_gemini(file_path, output_txt_path=None):
 
     filename = os.path.basename(abs_path)
     logging.info(f"Загрузка аудиофайла {filename} на серверы Google Gemini...")
-    audio_file = client.files.upload(file=abs_path)
+
+    # Защита от UnicodeEncodeError в заголовках httpx для файлов с кириллицей
+    temp_upload_path = None
+    try:
+        filename.encode('ascii')
+        upload_path = abs_path
+    except UnicodeEncodeError:
+        import tempfile
+        ext = os.path.splitext(filename)[1] or ".wav"
+        temp_file = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
+        temp_upload_path = temp_file.name
+        temp_file.close()
+        shutil.copy2(abs_path, temp_upload_path)
+        upload_path = temp_upload_path
+
+    try:
+        audio_file = client.files.upload(file=upload_path)
+    finally:
+        if temp_upload_path and os.path.exists(temp_upload_path):
+            try:
+                os.remove(temp_upload_path)
+            except Exception:
+                pass
+
     logging.info(f"Файл {filename} загружен в Gemini API. Имя объекта: {audio_file.name}")
 
     prompt = (
@@ -272,7 +295,7 @@ def transcribe_with_gemini(file_path, output_txt_path=None):
         "Пиши точно на том языке, на котором говорят участники (казахский/русский), не переводи и не добавляй вводных слов от себя, верни только диалог."
     )
 
-    models_to_try = ["gemini-2.5-flash", "gemini-1.5-flash"]
+    models_to_try = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"]
     text = None
 
     for model_name in models_to_try:
@@ -287,7 +310,13 @@ def transcribe_with_gemini(file_path, output_txt_path=None):
                 logging.info(f"Успешный ответ от {model_name}.")
                 break
         except Exception as e:
-            logging.warning(f"Ошибка при вызове {model_name}: {e}")
+            err_msg = str(e)
+            logging.warning(f"Ошибка при вызове {model_name}: {err_msg[:120]}")
+            if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                logging.info(f"Переключение на следующую доступную модель...")
+                time.sleep(2)
+            else:
+                time.sleep(1)
 
     # Удаляем временный файл на сервере Google
     try:

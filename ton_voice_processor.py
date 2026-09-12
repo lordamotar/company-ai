@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import re
 import json
 import logging
@@ -225,15 +226,58 @@ def process_text_sentiment_lines(call_id, transcript_text, cursor):
                 phrase = re.sub(r"^\*{0,2}Клиент:\*{0,2}\s*", "", line)
                 
             truncated_line = phrase[:500]
-            result = classifier(truncated_line)[0]
-            
-            sentiment_map = {
-                "POSITIVE": "ПОЗИТИВНЫЙ",
-                "NEGATIVE": "НЕГАТИВНЫЙ",
-                "NEUTRAL": "НЕЙТРАЛЬНЫЙ"
+            clean_words = re.sub(r'[^\w\s]', '', phrase.lower()).strip().split()
+            clean_str = " ".join(clean_words)
+
+            # 1. Диалоговые междометия и короткие подтверждения (всегда нейтральны)
+            NEUTRAL_INTERJECTIONS = {
+                "угу", "ага", "да", "нет", "ок", "окей", "okay", "хорошо", "понятно", "ясно",
+                "ладно", "слушаю", "алло", "так", "так-с", "так точно", "конечно", "верно",
+                "минуту", "секунду", "пару минут", "липучка", "шипы", "размер", "цена", "алматы",
+                "астана", "шымкент", "караганда", "зима", "лето", "шипованный", "с 10", "с десяти"
             }
-            sentiment_label = sentiment_map.get(result['label'], result['label'])
-            conf = float(result['score'] * 100)
+
+            # Маркеры реального негатива/претензии/ругани
+            NEGATIVE_KEYWORDS = [
+                "ужас", "кошмар", "отврат", "брак", "обман", "мошенник", "претензи",
+                "жалоб", "верните деньги", "хам", "груб", "суд", "некомпетент", "издева", "надоел",
+                "безобрази", "отвратительн", "почему так долго", "вы с ума сошли", "идиотизм"
+            ]
+            has_explicit_neg = any(kw in clean_str for kw in NEGATIVE_KEYWORDS)
+
+            # Вопросительные фразы поиска информации или уточнения связи/параметров
+            is_info_query = (
+                "?" in phrase or any(w in clean_str for w in [
+                    "сколько", "цена", "стоимость", "когда", "какой", "какая", "какие", "где",
+                    "наличие", "подскажите", "работает", "работаете", "слышно", "плохо слышно",
+                    "нагрузк", "индекс", "баллон", "размер"
+                ])
+            ) and not has_explicit_neg
+
+            is_short_interjection = (clean_str in NEUTRAL_INTERJECTIONS) or (len(clean_words) <= 3 and not has_explicit_neg)
+
+            if is_short_interjection or is_info_query:
+                sentiment_label = "НЕЙТРАЛЬНЫЙ"
+                conf = 95.0
+            else:
+                result = classifier(truncated_line)[0]
+                raw_label = result['label']
+                raw_score = float(result['score'])
+
+                # Без явных слов претензии/конфликта реплика не может быть признана негативной
+                if raw_label == "NEGATIVE":
+                    if has_explicit_neg:
+                        sentiment_label = "НЕГАТИВНЫЙ"
+                        conf = round(raw_score * 100, 2)
+                    else:
+                        sentiment_label = "НЕЙТРАЛЬНЫЙ"
+                        conf = 85.0
+                elif raw_label == "POSITIVE":
+                    sentiment_label = "ПОЗИТИВНЫЙ"
+                    conf = round(raw_score * 100, 2)
+                else:
+                    sentiment_label = "НЕЙТРАЛЬНЫЙ"
+                    conf = round(raw_score * 100, 2)
             
             cursor.execute("""
                 INSERT INTO call_text_sentiment_lines (call_id, line_number, speaker, phrase_text, sentiment_label, confidence)
@@ -267,6 +311,11 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
         "tone_summary": "краткое резюме настроения разговора в 1-2 предложениях"
     }}
 
+    СТРОГИЕ ПРАВИЛА:
+    1. conflict_detected = true ТОЛЬКО при реальной ссоре, ругани, хамстве, оскорблениях или официальных претензиях.
+    2. Обычные рабочие моменты (товара нет в нужном городе, клиент выбирает другой филиал, уточняет цены или график) НЕ являются конфликтом (conflict_detected = false).
+    3. Если клиент вежливо завершил разговор и поблагодарил, satisfaction_score должен быть не ниже 4.
+
     Диалог:
     {transcript_text[:4000]}
     """
@@ -275,16 +324,20 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
     
     # 1. Пробуем через Gemini API (Google)
     if gemini_key:
-        try:
-            from google import genai
-            client = genai.Client(api_key=gemini_key)
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
-            content = response.text.strip()
-        except Exception as e:
-            logging.warning(f"[Тон 5] Не удалось выполнить через Gemini: {e}")
+        from google import genai
+        client = genai.Client(api_key=gemini_key)
+        for model_name in ["gemini-3.5-flash", "gemini-3.5-flash-lite"]:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt
+                )
+                content = response.text.strip()
+                if content:
+                    break
+            except Exception as e:
+                logging.warning(f"[Тон 5] Ошибка при вызове {model_name}: {str(e)[:120]}")
+                time.sleep(1)
             
     # 2. Если не получилось, пробуем через OpenRouter
     if not content and openrouter_key:
