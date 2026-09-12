@@ -35,10 +35,10 @@ function updateKpis(data) {
     const avgScript = Math.round(totalScript / total);
     if (scriptScoreEl) scriptScoreEl.innerText = `${avgScript}%`;
 
-    // Доля позитивных эмоций
-    const happyCalls = data.filter(c => c.emotionClass === "happy" || c.emotion === "Радость").length;
-    const happyPct = Math.round((happyCalls / total) * 100);
-    if (posToneEl) posToneEl.innerText = `${happyPct}%`;
+    // Доля звонков с позитивным / конструктивным тоном (без конфликтов и негатива)
+    const positiveCalls = data.filter(c => !c.conflict && c.emotionClass !== "angry" && c.emotionClass !== "sad").length;
+    const positivePct = Math.round((positiveCalls / total) * 100);
+    if (posToneEl) posToneEl.innerText = `${positivePct}%`;
 
     // Конфликты
     const conflicts = data.filter(c => c.conflict).length;
@@ -2150,7 +2150,7 @@ document.addEventListener("DOMContentLoaded", () => {
             filtered = filtered.filter(c => 
                 c.conflict === true || 
                 Number(c.csat) <= 2 || 
-                (c.clientTone && (c.clientTone.sentimentEnd === "Недовольный" || c.clientTone.sad >= 15 || c.clientTone.angry > 0))
+                (c.clientTone && (c.clientTone.sentimentEnd === "Недовольный" || c.clientTone.sad >= 25 || c.clientTone.angry > 0))
             );
             if (activeBadgeBar) {
                 activeBadgeBar.style.display = "flex";
