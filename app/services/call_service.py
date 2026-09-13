@@ -30,7 +30,7 @@ def get_all_audit_logs() -> List[dict]:
         raise HTTPException(status_code=500, detail=f"Ошибка загрузки журнала аудита: {e}")
 
 def update_call_details(data: CallUpdateRequest) -> CallUpdateResponse:
-    """Обновляет имя менеджера и город в звонке, фиксируя историю в call_audit_logs."""
+    """Обновляет имя менеджера, город и коммерческие параметры звонка, фиксируя историю в call_audit_logs."""
     call_id = data.call_id
     new_manager = data.manager_name.strip() or "Оператор"
     new_city = data.city_name.strip() or "Алматы"
@@ -41,20 +41,54 @@ def update_call_details(data: CallUpdateRequest) -> CallUpdateResponse:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # 1. Получаем текущие сохраненные данные
-                cur.execute("SELECT manager_name, city_name FROM call_transcriptions WHERE id = %s;", (call_id,))
+                cur.execute("""
+                    SELECT manager_name, city_name, sale_status, order_sum, has_upsell, upsell_sum, upsell_text, service_booking, service_date 
+                    FROM call_transcriptions 
+                    WHERE id = %s;
+                """, (call_id,))
                 row = cur.fetchone()
                 if not row:
                     raise HTTPException(status_code=404, detail=f"Звонок с ID {call_id} не найден в базе данных")
 
-                old_manager = row[0] if row[0] else "Оператор"
-                old_city = row[1] if row[1] else "Алматы"
+                old_manager = row[0] or "Оператор"
+                old_city = row[1] or "Алматы"
+                old_sale = row[2] or "Консультация"
+                old_order_sum = row[3] or "0 ₸"
+                old_has_upsell = bool(row[4])
+                old_upsell_sum = row[5] or "0 ₸"
+                old_upsell_text = row[6] or ""
+                old_service = row[7] or "Нет"
+                old_service_date = row[8] or ""
+
+                sale_status = data.sale_status if data.sale_status is not None else old_sale
+                order_sum = data.order_sum if data.order_sum is not None else old_order_sum
+                has_upsell = data.has_upsell if data.has_upsell is not None else old_has_upsell
+                upsell_sum = data.upsell_sum if data.upsell_sum is not None else old_upsell_sum
+                upsell_text = data.upsell_text if data.upsell_text is not None else old_upsell_text
+                service_booking = data.service_booking if data.service_booking is not None else old_service
+                service_date = data.service_date if data.service_date is not None else old_service_date
 
                 # 2. Обновляем в call_transcriptions
                 cur.execute("""
                     UPDATE call_transcriptions 
-                    SET manager_name = %s, city_name = %s 
+                    SET manager_name = %s, city_name = %s,
+                        sale_status = %s, order_sum = %s, has_upsell = %s, upsell_sum = %s, upsell_text = %s, service_booking = %s, service_date = %s,
+                        client_name = COALESCE(%s, client_name),
+                        car_model = COALESCE(%s, car_model),
+                        tire_brand = COALESCE(%s, tire_brand),
+                        tire_size = COALESCE(%s, tire_size),
+                        tire_season = COALESCE(%s, tire_season),
+                        tire_count = COALESCE(%s, tire_count),
+                        branch_address = COALESCE(%s, branch_address),
+                        payment_method = COALESCE(%s, payment_method),
+                        lost_reason = COALESCE(%s, lost_reason)
                     WHERE id = %s;
-                """, (new_manager, new_city, call_id))
+                """, (
+                    new_manager, new_city, sale_status, order_sum, has_upsell, upsell_sum, upsell_text, service_booking, service_date,
+                    data.client_name, data.car_model, data.tire_brand, data.tire_size, data.tire_season, data.tire_count,
+                    data.branch_address, data.payment_method, data.lost_reason,
+                    call_id
+                ))
 
                 # 3. Логируем изменения менеджера
                 if old_manager != new_manager:
@@ -70,19 +104,45 @@ def update_call_details(data: CallUpdateRequest) -> CallUpdateResponse:
                         VALUES (%s, 'city_name', %s, %s, %s, %s);
                     """, (call_id, old_city, new_city, changed_by, comment))
 
+                # 5. Логируем изменения продажи / статуса
+                if old_sale != sale_status:
+                    cur.execute("""
+                        INSERT INTO call_audit_logs (call_id, field_name, old_value, new_value, changed_by, comment)
+                        VALUES (%s, 'sale_status', %s, %s, %s, %s);
+                    """, (call_id, old_sale, sale_status, changed_by, comment))
+
+                if old_order_sum != order_sum:
+                    cur.execute("""
+                        INSERT INTO call_audit_logs (call_id, field_name, old_value, new_value, changed_by, comment)
+                        VALUES (%s, 'order_sum', %s, %s, %s, %s);
+                    """, (call_id, old_order_sum, order_sum, changed_by, comment))
+
+                if old_service != service_booking:
+                    cur.execute("""
+                        INSERT INTO call_audit_logs (call_id, field_name, old_value, new_value, changed_by, comment)
+                        VALUES (%s, 'service_booking', %s, %s, %s, %s);
+                    """, (call_id, old_service, service_booking, changed_by, comment))
+
                 conn.commit()
 
-        # 5. Мгновенно синхронизируем данные
+        # 6. Мгновенно синхронизируем данные
         sync_data_if_needed(force=True)
 
         return CallUpdateResponse(
             success=True,
-            message=f"Данные по звонку #{call_id} успешно обновлены и зафиксированы в журнале аудита.",
+            message=f"Данные по звонку #{call_id} (включая результат сделки и услуги) успешно сохранены.",
             call_id=call_id,
             manager_name=new_manager,
-            city_name=new_city
+            city_name=new_city,
+            sale_status=sale_status,
+            order_sum=order_sum,
+            has_upsell=has_upsell,
+            service_booking=service_booking,
+            client_name=data.client_name,
+            tire_brand=data.tire_brand,
+            tire_size=data.tire_size
         )
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Ошибка обновления данных звонка: {e}")

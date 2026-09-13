@@ -292,6 +292,121 @@ def process_text_sentiment_lines(call_id, transcript_text, cursor):
 # ---------------------------------------------------------
 # 4. Тон-войс 5: Комплексный смысловой LLM-анализ диалога
 # ---------------------------------------------------------
+# ---------------------------------------------------------
+# Справочники для резервного извлечения данных (Fallback)
+# ---------------------------------------------------------
+FALLBACK_BRANDS = [
+    "Continental", "Nokian", "Nordman", "Pirelli", "Michelin", "Bridgestone",
+    "Cordiant", "Viatti", "Triangle", "Sailun", "Yokohama", "Goodyear",
+    "Hankook", "Kormoran", "Maxxis", "Linglong", "Кама", "Dunlop", "Kumho",
+    "Nexen", "Toyo", "Barum", "Matador", "Gislaved", "BFGoodrich", "Goodrich",
+    "Skad", "Trebl", "K&K", "Replay"
+]
+
+FALLBACK_CAR_MODELS = [
+    "Camry", "RAV4", "Corolla", "Prado", "Land Cruiser", "Highlander", "Avensis",
+    "Accent", "Elantra", "Sonata", "Tucson", "Santa Fe", "Creta",
+    "Rio", "Cerato", "K5", "Optima", "Sportage", "Sorento", "Seltos",
+    "Cobalt", "Nexia", "Lacetti", "Gentra", "Malibu", "Tracker",
+    "Polo", "Golf", "Passat", "Tiguan", "Touareg",
+    "Duster", "Logan", "Sandero", "Kaptur",
+    "Vesta", "Granta", "Largus", "Priora", "Niva",
+    "Mazda 3", "Mazda 6", "CX-5", "Subaru", "Forester", "Outback"
+]
+
+FALLBACK_BRANCHES = [
+    "Карагайлы", "Жандосова", "Рыскулова", "Райымбека", "Суюнбая",
+    "Толе би", "Сейфуллина", "Саина", "Майлина", "Шаляпина",
+    "Семей", "Павлодар", "Усть-Каменогорск", "Караганда", "Астана", "Шымкент", "Актобе"
+]
+
+def extract_entities_fallback(text):
+    """Резервный алгоритм извлечения параметров шин, авто, клиента и сделки по регулярным выражениям."""
+    if not text:
+        return {}
+        
+    text_lower = text.lower()
+    res = {}
+
+    # 1. Бренд
+    for b in FALLBACK_BRANDS:
+        if b.lower() in text_lower:
+            res["tire_brand"] = b
+            break
+
+    # 2. Типоразмер
+    m_size = re.search(r'(\d{3}[\s/]\d{2}[\s/R]*\d{2})', text, re.I)
+    if m_size:
+        res["tire_size"] = m_size.group(1).replace(" ", "/").upper()
+    else:
+        m_r = re.search(r'R\s*(\d{2})', text, re.I)
+        if m_r:
+            res["tire_size"] = f"R{m_r.group(1)}"
+
+    # 3. Марка авто
+    for car in FALLBACK_CAR_MODELS:
+        if car.lower() in text_lower:
+            res["car_model"] = car
+            break
+
+    # 4. Сезонность
+    if "шип" in text_lower or "шипован" in text_lower:
+        res["tire_season"] = "Зимние шипованные"
+    elif "липуч" in text_lower or "фрикцион" in text_lower:
+        res["tire_season"] = "Зимние фрикционные (липучка)"
+    elif "летн" in text_lower or "лето" in text_lower:
+        res["tire_season"] = "Летние"
+    elif "всесезон" in text_lower:
+        res["tire_season"] = "Всесезонные"
+    elif "зимн" in text_lower or "зима" in text_lower:
+        res["tire_season"] = "Зимние"
+
+    # 5. Количество
+    m_cnt = re.search(r'(\d+)\s*(?:шт|штук|баллон|колес)', text_lower)
+    if m_cnt:
+        res["tire_count"] = f"{m_cnt.group(1)} шт."
+    elif "комплект" in text_lower:
+        res["tire_count"] = "4 шт. (комплект)"
+
+    # 6. Филиал
+    for br in FALLBACK_BRANCHES:
+        if br.lower() in text_lower:
+            res["branch_address"] = br
+            break
+
+    # 7. Оплата
+    if "kaspi red" in text_lower or "каспи ред" in text_lower:
+        res["payment_method"] = "Kaspi Red"
+    elif "kaspi qr" in text_lower or "каспи qr" in text_lower or "каспи кюар" in text_lower:
+        res["payment_method"] = "Kaspi QR"
+    elif "рассрочк" in text_lower:
+        res["payment_method"] = "Kaspi Рассрочка"
+    elif "безнал" in text_lower or "счет на оплату" in text_lower:
+        res["payment_method"] = "Безналичный расчет"
+    elif "в филиале" in text_lower or "на кассе" in text_lower or "наличн" in text_lower:
+        res["payment_method"] = "Оплата в филиале"
+
+    # 8. Имя клиента
+    m_client = re.search(r'(?:на\s+имя|клиент\s+зовут|меня\s+зовут)\s+([А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+)?)', text, re.I)
+    if m_client:
+        c_name = m_client.group(1).strip()
+        if c_name.lower() not in ["компания", "эйкос", "оператор"]:
+            res["client_name"] = c_name
+
+    # 9. Услуги и сервис
+    if "шиномонтаж" in text_lower or "переобувк" in text_lower or "монтаж" in text_lower:
+        res["service_booking"] = "Шиномонтаж"
+    elif "хранен" in text_lower:
+        res["service_booking"] = "Сезонное хранение"
+    elif "балансировк" in text_lower:
+        res["service_booking"] = "Балансировка"
+
+    return res
+
+
+# ---------------------------------------------------------
+# 4. Тон-войс 5: Комплексный смысловой LLM-анализ диалога
+# ---------------------------------------------------------
 def process_llm_sentiment(call_id, transcript_text, cursor):
     if not transcript_text:
         return
@@ -300,7 +415,8 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
     openrouter_key = os.environ.get("OPENROUTER_API_KEY")
     
     prompt = f"""
-    Проанализируй диалог между Менеджером и Клиентом и верни СТРОГО валидный JSON (без markdown блоков, без обратных кавычек ```json):
+    Ты — ведущий AI-аналитик отдела контроля качества сети шинных центров Aikos (Эйкос).
+    Внимательно проанализируй диалог между Менеджером и Клиентом и верни СТРОГО валидный JSON (без markdown блоков, без обратных кавычек ```json):
     {{
         "customer_sentiment_start": "нейтральный | позитивный | раздраженный",
         "customer_sentiment_end": "удовлетворенный | позитивный | нейтральный | недовольный",
@@ -308,13 +424,39 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
         "manager_politeness": 5,
         "conflict_detected": false,
         "conflict_reason": "краткая причина или null если конфликта нет",
-        "tone_summary": "краткое резюме настроения разговора в 1-2 предложениях"
+        "tone_summary": "краткое резюме настроения разговора в 1-2 предложениях",
+        "manager_name": "имя менеджера если названо (например Жандос, Руслан) или null",
+        "city_name": "город филиала если назван (например Алматы, Астана, Шымкент) или null",
+        "client_name": "фамилия и имя клиента если названы (например 'Канапьянов Елдос', 'Марат') или null",
+        "car_model": "марка и модель авто клиента если упоминались (например 'Toyota Camry', 'Hyundai Tucson', 'Cobalt') или null",
+        "tire_brand": "бренд шин или дисков (например 'Cordiant', 'BFGoodrich', 'Nokian', 'Viatti', 'Triangle', 'Skad') или null",
+        "tire_size": "типоразмер (например '215/70 R16', '205/65 R15', '185/65 R14') или null",
+        "tire_season": "сезонность: 'Зимние шипованные' | 'Зимние фрикционные (липучка)' | 'Летние' | 'Всесезонные' или null",
+        "tire_count": "количество шин/товаров (например '4 шт.', '2 шт.', 'комплект') или null",
+        "branch_address": "конкретный филиал или склад самовывоза (например 'Карагайлы', 'Жандосова', 'Рыскулова', 'Семей') или null",
+        "payment_method": "способ оплаты ('Kaspi QR' | 'Kaspi Red' | 'Рассрочка Kaspi' | 'Оплата в филиале' | 'Безналичный расчет') или null",
+        "sale_status": "Продажа состоялась | Бронь оформлена | Консультация | Отказ от покупки",
+        "order_sum": "Сумма сделки/брони в тенге с пробелом и символом ₸, например '160 000 ₸', '87 000 ₸'. Если продажи или брони не было, ставь '0 ₸'",
+        "has_upsell": false,
+        "upsell_sum": "Сумма допродажи с ₸, например '6 000 ₸', '98 200 ₸' или '0 ₸'",
+        "upsell_text": "Что допродано (например: 'Комплексный шиномонтаж', 'Сезонное хранение шин', 'Диски Skad') или пустая строка",
+        "service_booking": "Нет | Шиномонтаж | Сезонное хранение | Балансировка | Ремонт шин | Другое",
+        "service_date": "Согласованная дата/время записи на сервис или самовывоз (например: '2020-10-16', 'Завтра', 'Согласовано') или пустая строка",
+        "lost_reason": "Если сделки/брони не было — краткая причина отказа ('Сравнивает цены / думает', 'Нет в наличии на складе', 'Слишком дорого', 'Далеко ехать') или null",
+        "call_summary": "Краткая суть разговора в 1-2 предложениях (цель обращения клиента и достигнутый результат)"
     }}
 
-    СТРОГИЕ ПРАВИЛА:
-    1. conflict_detected = true ТОЛЬКО при реальной ссоре, ругани, хамстве, оскорблениях или официальных претензиях.
-    2. Обычные рабочие моменты (товара нет в нужном городе, клиент выбирает другой филиал, уточняет цены или график) НЕ являются конфликтом (conflict_detected = false).
-    3. Если клиент вежливо завершил разговор и поблагодарил, satisfaction_score должен быть не ниже 4.
+    ПРАВИЛА ОПРЕДЕЛЕНИЯ КОММЕРЧЕСКОГО РЕЗУЛЬТАТА И ФИКСАЦИИ:
+    1. "Продажа состоялась": клиент подтвердил покупку, согласовал оплату, доставку или выписку счета.
+    2. "Бронь оформлена": менеджер зафиксировал бронь/резерв шин или дисков, либо договорился о бронировании через WhatsApp/визите в филиал для оплаты и самовывоза (например: «поставлю на резерв», «забронировал», «отправлю на вацап, поставлю бронь, в филиале оплатите заберете», «приезжайте забирайте, бронь стоит»). Если клиент согласился на резерв или подтвердил связь в WhatsApp для выбора и фиксации заказа — это СТРОГО "Бронь оформлена".
+    3. "Отказ от покупки": клиент явно отказался от покупки (дорого, нет в наличии и не согласен ждать, передумал).
+    4. "Консультация": клиент только узнавал наличие, цены или адреса без договоренности о покупке или бронировании (order_sum = "0 ₸").
+    5. РАСЧЕТ СУММЫ (order_sum): если названа цена за 1 шину (например, 38 750) и клиент берет комплект из 4 шт, рассчитай общую сумму: 38 750 * 4 = 155 000 ₸. Если сумма названа прямо — укажи её.
+    6. ДОПРОДАЖА (has_upsell): true, если кроме основных шин клиент согласился/забронировал диски, услуги шиномонтажа со скидкой, сезонного хранения, датчики давления или расширенную гарантию. Укажи upsell_sum и upsell_text.
+    7. ЗАПИСЬ НА СЕРВИС (service_booking): если клиент записался или договорился на шиномонтаж, хранение или другую услугу, укажи название услуги и дату (service_date). Если записи нет — service_booking = "Нет", service_date = "".
+    8. conflict_detected = true ТОЛЬКО при реальной ссоре, ругани, хамстве, оскорблениях или официальных претензиях.
+    9. Обычные рабочие моменты (товара нет в нужном филиале, подбор аналогов) НЕ являются конфликтом (conflict_detected = false).
+    10. Если клиент вежливо завершил разговор и поблагодарил, satisfaction_score должен быть не ниже 4.
 
     Диалог:
     {transcript_text[:4000]}
@@ -322,11 +464,11 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
     
     content = None
     
-    # 1. Пробуем через Gemini API (Google)
+    # 1. Пробуем через актуальный Gemini API (Google)
     if gemini_key:
         from google import genai
         client = genai.Client(api_key=gemini_key)
-        for model_name in ["gemini-3.5-flash", "gemini-3.5-flash-lite"]:
+        for model_name in ["gemini-3.6-flash", "gemini-2.5-flash"]:
             try:
                 response = client.models.generate_content(
                     model=model_name,
@@ -358,18 +500,27 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
         except Exception as e:
             logging.error(f"[Тон 5] Ошибка при вызове OpenRouter: {e}")
             
-    if not content:
-        logging.warning("[Тон 5] Не удалось получить ответ LLM для анализа настроения.")
-        return
-        
+    # 3. Парсим ответ либо берем резервный fallback
+    data = {}
+    if content:
+        try:
+            json_match = re.search(r"\{.*\}", content, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group(0))
+            else:
+                data = json.loads(content)
+        except Exception as err:
+            logging.warning(f"[Тон 5] Не удалось распарсить JSON от LLM: {err}")
+
+    # Дополняем недостающие поля через fallback эвристики
+    fallback = extract_entities_fallback(transcript_text)
+    for k, v in fallback.items():
+        if not data.get(k):
+            data[k] = v
+
     try:
-        json_match = re.search(r"\{.*\}", content, re.DOTALL)
-        if json_match:
-            data = json.loads(json_match.group(0))
-        else:
-            data = json.loads(content)
-            
-        query = """
+        # 1. Сохранение Tone of Voice и CSAT в customer_sentiment
+        query_sentiment = """
             INSERT INTO customer_sentiment (
                 call_id, customer_sentiment_start, customer_sentiment_end,
                 satisfaction_score, manager_politeness, conflict_detected,
@@ -385,7 +536,7 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
                 conflict_reason = EXCLUDED.conflict_reason,
                 tone_summary = EXCLUDED.tone_summary;
         """
-        cursor.execute(query, (
+        cursor.execute(query_sentiment, (
             call_id,
             data.get("customer_sentiment_start", "нейтральный"),
             data.get("customer_sentiment_end", "позитивный"),
@@ -393,11 +544,94 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
             int(data.get("manager_politeness", 5)),
             bool(data.get("conflict_detected", False)),
             data.get("conflict_reason") if data.get("conflict_detected") else None,
-            data.get("tone_summary", "Разговор прошел успешно.")
+            data.get("tone_summary", data.get("call_summary", "Разговор прошел успешно."))
         ))
-        logging.info(f"[Тон 5] Смысловой LLM-анализ сохранен для call_id={call_id}")
+
+        # 2. Автоматическая фиксация сделки, допродажи, сервиса и всех параметров в call_transcriptions
+        sale_status = data.get("sale_status", "Консультация")
+        order_sum = str(data.get("order_sum", "0 ₸"))
+        has_upsell = bool(data.get("has_upsell", False))
+        upsell_sum = str(data.get("upsell_sum", "0 ₸"))
+        upsell_text = str(data.get("upsell_text", ""))
+        service_booking = str(data.get("service_booking", "Нет"))
+        service_date = str(data.get("service_date", ""))
+        mgr_name = data.get("manager_name")
+        city_name = data.get("city_name")
+
+        client_name = data.get("client_name")
+        car_model = data.get("car_model")
+        tire_brand = data.get("tire_brand")
+        tire_size = data.get("tire_size")
+        tire_season = data.get("tire_season")
+        tire_count = data.get("tire_count")
+        branch_address = data.get("branch_address")
+        payment_method = data.get("payment_method")
+        lost_reason = data.get("lost_reason")
+        call_summary = data.get("call_summary") or data.get("tone_summary")
+
+        query_commercial = """
+            UPDATE call_transcriptions
+            SET sale_status = %s,
+                order_sum = %s,
+                has_upsell = %s,
+                upsell_sum = %s,
+                upsell_text = %s,
+                service_booking = %s,
+                service_date = %s,
+                client_name = COALESCE(%s, client_name),
+                car_model = COALESCE(%s, car_model),
+                tire_brand = COALESCE(%s, tire_brand),
+                tire_size = COALESCE(%s, tire_size),
+                tire_season = COALESCE(%s, tire_season),
+                tire_count = COALESCE(%s, tire_count),
+                branch_address = COALESCE(%s, branch_address),
+                payment_method = COALESCE(%s, payment_method),
+                lost_reason = COALESCE(%s, lost_reason),
+                call_summary = COALESCE(%s, call_summary)
+            WHERE id = %s;
+        """
+        cursor.execute(query_commercial, (
+            sale_status,
+            order_sum,
+            has_upsell,
+            upsell_sum,
+            upsell_text,
+            service_booking,
+            service_date,
+            client_name,
+            car_model,
+            tire_brand,
+            tire_size,
+            tire_season,
+            tire_count,
+            branch_address,
+            payment_method,
+            lost_reason,
+            call_summary,
+            call_id
+        ))
+
+        if mgr_name and mgr_name.strip():
+            cursor.execute("""
+                UPDATE call_transcriptions 
+                SET manager_name = %s 
+                WHERE id = %s AND (manager_name IS NULL OR manager_name = 'Оператор');
+            """, (mgr_name.strip().capitalize(), call_id))
+
+        if city_name and city_name.strip():
+            cursor.execute("""
+                UPDATE call_transcriptions 
+                SET city_name = %s 
+                WHERE id = %s AND (city_name IS NULL OR city_name = 'Алматы' OR city_name = '');
+            """, (city_name.strip(), call_id))
+
+        logging.info(
+            f"[Тон 5 & Фиксация] call_id={call_id}: статус='{sale_status}', сумма={order_sum}, "
+            f"допродажа={has_upsell} ({upsell_sum}, {upsell_text}), сервис='{service_booking}' ({service_date}), "
+            f"бренд={tire_brand}, размер={tire_size}, клиент={client_name}, авто={car_model}"
+        )
     except Exception as e:
-        logging.error(f"[Тон 5] Ошибка при вызове LLM-анализа: {e}")
+        logging.error(f"[Тон 5] Ошибка при парсинге и сохранении LLM-анализа: {e}", exc_info=True)
 
 
 # ---------------------------------------------------------

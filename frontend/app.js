@@ -2,6 +2,124 @@
 let callsData = [];
 let auditLogsData = [];
 
+// Глобальное состояние универсальной пагинации (10/25/50/100) для всех страниц
+const paginationState = {
+    calls: { page: 1, pageSize: 10 },
+    clients: { page: 1, pageSize: 10 },
+    audit: { page: 1, pageSize: 10 },
+    managers: { page: 1, pageSize: 10 }
+};
+
+let currentCallsList = [];
+let currentClientsList = [];
+let currentAuditList = [];
+let currentManagersList = [];
+
+// Универсальный рендер элементов управления пагинацией (10/25/50/100)
+function renderPaginationControls({
+    pageSizeSelectId,
+    infoId,
+    firstBtnId,
+    prevBtnId,
+    numbersId,
+    nextBtnId,
+    lastBtnId,
+    currentPage,
+    pageSize,
+    totalItems,
+    onPageChange,
+    onPageSizeChange
+}) {
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const page = Math.min(Math.max(1, currentPage), totalPages);
+
+    // 1. Текст информации о записях
+    const infoEl = document.getElementById(infoId);
+    if (infoEl) {
+        if (totalItems === 0) {
+            infoEl.innerText = "0 записей";
+        } else {
+            const start = (page - 1) * pageSize + 1;
+            const end = Math.min(page * pageSize, totalItems);
+            infoEl.innerText = `Показано ${start}–${end} из ${totalItems}`;
+        }
+    }
+
+    // 2. Селектор количества строк на странице (10/25/50/100)
+    const selectEl = document.getElementById(pageSizeSelectId);
+    if (selectEl) {
+        selectEl.value = String(pageSize);
+        selectEl.onchange = (e) => {
+            const newSize = parseInt(e.target.value, 10) || 10;
+            onPageSizeChange(newSize);
+        };
+    }
+
+    // 3. Навигационные кнопки « ‹ › »
+    const firstBtn = document.getElementById(firstBtnId);
+    const prevBtn = document.getElementById(prevBtnId);
+    const nextBtn = document.getElementById(nextBtnId);
+    const lastBtn = document.getElementById(lastBtnId);
+
+    if (firstBtn) {
+        firstBtn.disabled = (page <= 1);
+        firstBtn.onclick = () => onPageChange(1);
+    }
+    if (prevBtn) {
+        prevBtn.disabled = (page <= 1);
+        prevBtn.onclick = () => onPageChange(page - 1);
+    }
+    if (nextBtn) {
+        nextBtn.disabled = (page >= totalPages);
+        nextBtn.onclick = () => onPageChange(page + 1);
+    }
+    if (lastBtn) {
+        lastBtn.disabled = (page >= totalPages);
+        lastBtn.onclick = () => onPageChange(totalPages);
+    }
+
+    // 4. Номерные кнопки страниц
+    const numbersEl = document.getElementById(numbersId);
+    if (numbersEl) {
+        numbersEl.innerHTML = "";
+
+        let startPage = Math.max(1, page - 2);
+        let endPage = Math.min(totalPages, page + 2);
+
+        if (startPage > 1) {
+            numbersEl.appendChild(createPageBtn(1, page, onPageChange));
+            if (startPage > 2) {
+                const dots = document.createElement("span");
+                dots.className = "page-dots";
+                dots.innerText = "…";
+                numbersEl.appendChild(dots);
+            }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            numbersEl.appendChild(createPageBtn(i, page, onPageChange));
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                const dots = document.createElement("span");
+                dots.className = "page-dots";
+                dots.innerText = "…";
+                numbersEl.appendChild(dots);
+            }
+            numbersEl.appendChild(createPageBtn(totalPages, page, onPageChange));
+        }
+    }
+}
+
+function createPageBtn(pageNum, currentPage, onClick) {
+    const btn = document.createElement("button");
+    btn.className = "page-btn" + (pageNum === currentPage ? " active" : "");
+    btn.innerText = pageNum;
+    btn.onclick = () => onClick(pageNum);
+    return btn;
+}
+
 // Функция динамического пересчета KPI-карточек на основе реальных данных из базы
 function updateKpis(data) {
     const totalEl = document.getElementById("kpiTotalCalls");
@@ -49,13 +167,30 @@ function updateKpis(data) {
     if (lostSalesEl) lostSalesEl.innerText = `~${(missedOppCount * 18000).toLocaleString('ru-RU')} ₸`;
 }
 
-// Рендеринг таблицы звонков (Экран 1)
-function renderCallsTable(data) {
+// Рендеринг таблицы звонков (Экран 1) с пагинацией
+function renderCallsTable(data, keepPage = false) {
     const tbody = document.getElementById("callsTableBody");
     if (!tbody) return;
     tbody.innerHTML = "";
 
     updateKpis(callsData);
+
+    currentCallsList = data || [];
+    const total = currentCallsList.length;
+
+    if (!keepPage) {
+        paginationState.calls.page = 1;
+    }
+
+    const pageSize = paginationState.calls.pageSize;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (paginationState.calls.page > totalPages) {
+        paginationState.calls.page = totalPages;
+    }
+    const page = paginationState.calls.page;
+
+    const startIndex = (page - 1) * pageSize;
+    const pagedCalls = currentCallsList.slice(startIndex, startIndex + pageSize);
 
     if (!data || data.length === 0) {
         tbody.innerHTML = `
@@ -69,71 +204,126 @@ function renderCallsTable(data) {
                 </td>
             </tr>
         `;
-        return;
+    } else {
+        pagedCalls.forEach(call => {
+            const tr = document.createElement("tr");
+            tr.onclick = () => openCallModal(call.id);
+
+            let emotionBadge = "";
+            if (call.emotionClass === "happy" || call.emotion === "Радость") {
+                emotionBadge = `<span class="badge badge-success">😊 ${call.emotion || "Радость"} ${call.emotionPct || ""}</span>`;
+            } else if (call.emotionClass === "sad" || call.emotion === "Грусть") {
+                emotionBadge = `<span class="badge badge-warning">🙁 ${call.emotion || "Грусть"} ${call.emotionPct || ""}</span>`;
+            } else if (call.emotionClass === "angry" || call.emotion === "Гнев") {
+                emotionBadge = `<span class="badge badge-warning" style="color: #f87171; border-color: rgba(239, 68, 68, 0.4);">😠 ${call.emotion || "Гнев"} ${call.emotionPct || ""}</span>`;
+            } else {
+                emotionBadge = `<span class="badge badge-neutral">😐 ${call.emotion || "Нейтральный"} ${call.emotionPct || ""}</span>`;
+            }
+
+            if (call.conflict || Number(call.csat) <= 2) {
+                emotionBadge += ` <span class="badge badge-warning" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); font-size: 10px; padding: 2px 6px; margin-left: 4px;" title="${call.conflictReason || 'Зафиксировано недовольство'}">⚠️ Претензия</span>`;
+            }
+
+            const isOut = (call.direction === "out");
+            const dirBadge = isOut 
+                ? `<span class="badge badge-primary" style="font-size: 10px; padding: 2px 6px;">↗ Исх</span>` 
+                : `<span class="badge badge-outline" style="font-size: 10px; padding: 2px 6px;">↙ Вх</span>`;
+
+            const managerName = call.manager || "Оператор";
+            const managerInitial = managerName[0] || "О";
+
+            let outcomeBadge = "";
+            if (call.saleStatus === "Продажа состоялась") {
+                outcomeBadge = `<span class="badge badge-success" style="font-size: 10px; padding: 2.5px 7px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); font-weight: 600;">🟢 Продажа${call.orderSum ? ' ' + call.orderSum : ''}</span>`;
+            } else if (call.saleStatus === "Бронь оформлена") {
+                outcomeBadge = `<span class="badge badge-success" style="font-size: 10px; padding: 2.5px 7px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); font-weight: 600;">🟢 Бронь${call.orderSum ? ' ' + call.orderSum : ''}</span>`;
+            } else if (call.saleStatus === "Отказ от покупки") {
+                outcomeBadge = `<span class="badge" style="font-size: 10px; padding: 2.5px 7px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); font-weight: 500;">🔴 Отказ</span>`;
+            } else {
+                outcomeBadge = `<span class="badge badge-neutral" style="font-size: 10px; padding: 2.5px 7px; font-weight: 500; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-secondary);">⚪ Консультация</span>`;
+            }
+
+            let upsellBadge = "";
+            if (call.hasUpsell) {
+                upsellBadge = `<span class="badge badge-success" style="font-size: 10px; padding: 2.5px 7px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); font-weight: 600;" title="Допродажа: ${call.upsellText || 'Услуга'} (${call.upsellSum || ''})">🟢 Доп. продажа${call.upsellSum ? ' +' + call.upsellSum : ''}</span>`;
+            }
+
+            let serviceBadge = "";
+            if (call.serviceBooking && call.serviceBooking !== "Нет") {
+                serviceBadge = `<span class="badge badge-success" style="font-size: 10px; padding: 2.5px 7px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); font-weight: 600;" title="Запись на сервис: ${call.serviceBooking}${call.serviceDate ? ' на ' + call.serviceDate : ''}">🟢 Сервис: ${call.serviceBooking}</span>`;
+            }
+
+            tr.innerHTML = `
+                <td>
+                    <div class="call-id-col">
+                        <span class="call-num">#${call.id} ${dirBadge}</span>
+                        <span class="call-time">${call.date || "—"} ${call.time || ""}</span>
+                    </div>
+                </td>
+                <td><span class="phone-badge">${call.phone || "Клиент"}</span></td>
+                <td>
+                    <div class="manager-badge" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" onclick="event.stopPropagation(); openEditCallModal(${call.id});" title="Нажмите, чтобы изменить данные звонка">
+                        <span class="manager-avatar-sm">${managerInitial}</span>
+                        <span>${managerName}</span>
+                        <span style="font-size: 11px; opacity: 0.7;" title="Редактировать">✏️</span>
+                    </div>
+                </td>
+                <td>
+                    <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                        ${outcomeBadge}
+                        ${upsellBadge ? upsellBadge : ''}
+                        ${serviceBadge ? serviceBadge : ''}
+                    </div>
+                </td>
+                <td>
+                    <div style="display: flex; flex-direction: column; gap: 3px;">
+                        <strong style="color: var(--text-primary); font-size: 13px;">${call.topic || "Консультация"}</strong>
+                        <span style="font-size: 11.5px; color: var(--text-secondary);">${call.tireSize || call.productCat || "Шины"}${call.tireBrand ? ' • ' + call.tireBrand : ''}</span>
+                    </div>
+                </td>
+                <td>
+                    <div style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding: 3px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2);" onclick="event.stopPropagation(); openCallAndPlayAudio(${call.id});" title="Нажмите, чтобы включить прослушку аудиозаписи">
+                        <span style="color: #38bdf8; font-size: 10px;">▶</span>
+                        <span style="color: #e2e8f0; font-size: 12px; font-family: monospace;">${call.duration || "—"}</span>
+                    </div>
+                </td>
+                <td>${emotionBadge}</td>
+                <td><span class="stars-score">⭐ ${call.csat || 5}.0 / 5</span></td>
+                <td><span class="badge ${call.statusClass || 'badge-success'}">${call.status || 'Обработан'}</span></td>
+                <td class="text-right" style="white-space: nowrap;">
+                    <button class="btn-icon" style="margin-right: 4px; padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;" onclick="event.stopPropagation(); openEditCallModal(${call.id});" title="Редактировать имя менеджера или город">
+                        ✏️
+                    </button>
+                    <button class="action-btn" onclick="event.stopPropagation(); openCallModal(${call.id});">
+                        Разбор AI
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
     }
 
-    data.forEach(call => {
-        const tr = document.createElement("tr");
-        tr.onclick = () => openCallModal(call.id);
-
-        let emotionBadge = "";
-        if (call.emotionClass === "happy" || call.emotion === "Радость") {
-            emotionBadge = `<span class="badge badge-success">😊 ${call.emotion || "Радость"} ${call.emotionPct || ""}</span>`;
-        } else if (call.emotionClass === "sad" || call.emotion === "Грусть") {
-            emotionBadge = `<span class="badge badge-warning">🙁 ${call.emotion || "Грусть"} ${call.emotionPct || ""}</span>`;
-        } else if (call.emotionClass === "angry" || call.emotion === "Гнев") {
-            emotionBadge = `<span class="badge badge-warning" style="color: #f87171; border-color: rgba(239, 68, 68, 0.4);">😠 ${call.emotion || "Гнев"} ${call.emotionPct || ""}</span>`;
-        } else {
-            emotionBadge = `<span class="badge badge-neutral">😐 ${call.emotion || "Нейтрально"} ${call.emotionPct || ""}</span>`;
+    // Отрисовка пагинации звонков
+    renderPaginationControls({
+        pageSizeSelectId: "callsPageSizeSelect",
+        infoId: "callsPaginationInfo",
+        firstBtnId: "callsPageFirst",
+        prevBtnId: "callsPagePrev",
+        numbersId: "callsPageNumbers",
+        nextBtnId: "callsPageNext",
+        lastBtnId: "callsPageLast",
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: total,
+        onPageChange: (newPage) => {
+            paginationState.calls.page = newPage;
+            renderCallsTable(currentCallsList, true);
+        },
+        onPageSizeChange: (newSize) => {
+            paginationState.calls.pageSize = newSize;
+            paginationState.calls.page = 1;
+            renderCallsTable(currentCallsList, true);
         }
-
-        if (call.conflict || Number(call.csat) <= 2) {
-            emotionBadge += ` <span class="badge badge-warning" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); font-size: 10px; padding: 2px 6px; margin-left: 4px;" title="${call.conflictReason || 'Зафиксировано недовольство'}">⚠️ Претензия</span>`;
-        }
-
-        const isOut = (call.direction === "out");
-        const dirBadge = isOut 
-            ? `<span class="badge badge-primary" style="font-size: 10px; padding: 2px 6px;">↗ Исх</span>` 
-            : `<span class="badge badge-outline" style="font-size: 10px; padding: 2px 6px;">↙ Вх</span>`;
-
-        const managerName = call.manager || "Оператор";
-        const managerInitial = managerName[0] || "О";
-
-        tr.innerHTML = `
-            <td>
-                <div class="call-id-col">
-                    <span class="call-num">#${call.id} ${dirBadge}</span>
-                    <span class="call-time">${call.date || "—"} ${call.time || ""}</span>
-                </div>
-            </td>
-            <td><span class="phone-badge">${call.phone || "Клиент"}</span></td>
-            <td>
-                <div class="manager-badge" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" onclick="event.stopPropagation(); openEditCallModal(${call.id});" title="Нажмите, чтобы изменить имя менеджера или город">
-                    <span class="manager-avatar-sm">${managerInitial}</span>
-                    <span>${managerName}</span>
-                    <span style="font-size: 11px; opacity: 0.7;" title="Редактировать">✏️</span>
-                </div>
-            </td>
-            <td><strong>${call.topic || "Консультация"}</strong></td>
-            <td>
-                <div style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding: 3px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2);" onclick="event.stopPropagation(); openCallAndPlayAudio(${call.id});" title="Нажмите, чтобы включить прослушку аудиозаписи">
-                    <span style="color: #38bdf8; font-size: 10px;">▶</span>
-                    <span style="color: #e2e8f0; font-size: 12px; font-family: monospace;">${call.duration || "—"}</span>
-                </div>
-            </td>
-            <td>${emotionBadge}</td>
-            <td><span class="stars-score">⭐ ${call.csat || 5}.0 / 5</span></td>
-            <td><span class="badge ${call.statusClass || 'badge-success'}">${call.status || 'Обработан'}</span></td>
-            <td class="text-right" style="white-space: nowrap;">
-                <button class="btn-icon" style="margin-right: 4px; padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;" onclick="event.stopPropagation(); openEditCallModal(${call.id});" title="Редактировать имя менеджера или город">
-                    ✏️
-                </button>
-                <button class="action-btn" onclick="event.stopPropagation(); openCallModal(${call.id});">
-                    Разбор AI
-                </button>
-            </td>
-        `;
-        tbody.appendChild(tr);
     });
 }
 
@@ -280,9 +470,8 @@ function renderDashboard(data) {
     }).join("");
 }
 
-// Рендеринг карточек менеджеров (Экран 3)
-// Рендеринг карточек менеджеров (Экран 3)
-function renderManagers(data) {
+// Рендеринг карточек менеджеров (Экран 3) с пагинацией
+function renderManagers(data, keepPage = false) {
     const grid = document.getElementById("managersCardsGrid");
     if (!grid) return;
     grid.innerHTML = "";
@@ -295,6 +484,20 @@ function renderManagers(data) {
                 <span>Анализируйте звонки для формирования рейтинга сотрудников</span>
             </div>
         `;
+        renderPaginationControls({
+            pageSizeSelectId: "managersPageSizeSelect",
+            infoId: "managersPaginationInfo",
+            firstBtnId: "managersPageFirst",
+            prevBtnId: "managersPagePrev",
+            numbersId: "managersPageNumbers",
+            nextBtnId: "managersPageNext",
+            lastBtnId: "managersPageLast",
+            currentPage: 1,
+            pageSize: paginationState.managers.pageSize,
+            totalItems: 0,
+            onPageChange: () => {},
+            onPageSizeChange: () => {}
+        });
         return;
     }
 
@@ -324,8 +527,22 @@ function renderManagers(data) {
     });
 
     const managersList = Object.values(managersMap);
+    currentManagersList = managersList;
+    const total = managersList.length;
 
-    managersList.forEach(m => {
+    if (!keepPage) {
+        paginationState.managers.page = 1;
+    }
+    const pageSize = paginationState.managers.pageSize;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (paginationState.managers.page > totalPages) {
+        paginationState.managers.page = totalPages;
+    }
+    const page = paginationState.managers.page;
+    const startIndex = (page - 1) * pageSize;
+    const pagedManagers = managersList.slice(startIndex, startIndex + pageSize);
+
+    pagedManagers.forEach(m => {
         const count = m.calls.length;
         const avgCsat = (m.totalCsat / count).toFixed(1);
         const avgScript = Math.round(m.totalScript / count);
@@ -374,6 +591,29 @@ function renderManagers(data) {
             </div>
         `;
         grid.appendChild(card);
+    });
+
+    // Отрисовка элементов пагинации менеджеров
+    renderPaginationControls({
+        pageSizeSelectId: "managersPageSizeSelect",
+        infoId: "managersPaginationInfo",
+        firstBtnId: "managersPageFirst",
+        prevBtnId: "managersPagePrev",
+        numbersId: "managersPageNumbers",
+        nextBtnId: "managersPageNext",
+        lastBtnId: "managersPageLast",
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: total,
+        onPageChange: (newPage) => {
+            paginationState.managers.page = newPage;
+            renderManagers(data, true);
+        },
+        onPageSizeChange: (newSize) => {
+            paginationState.managers.pageSize = newSize;
+            paginationState.managers.page = 1;
+            renderManagers(data, true);
+        }
     });
 }
 
@@ -817,8 +1057,8 @@ function groupCallsByClient(data) {
     return clientsArray.sort((a, b) => b.totalCalls - a.totalCalls);
 }
 
-// Рендеринг таблицы клиентов
-function renderClients(data) {
+// Рендеринг таблицы клиентов с пагинацией
+function renderClients(data, keepPage = false) {
     const tbody = document.getElementById("clientsTableBody");
     const badgeEl = document.getElementById("totalClientsBadge");
     const countKpi = document.getElementById("kpiClientsCount");
@@ -829,6 +1069,7 @@ function renderClients(data) {
 
     const clients = groupCallsByClient(data);
     const totalClients = clients.length;
+    currentClientsList = clients;
 
     if (badgeEl) badgeEl.innerText = totalClients;
     if (countKpi) countKpi.innerText = totalClients;
@@ -840,6 +1081,20 @@ function renderClients(data) {
         if (repeatKpi) repeatKpi.innerText = "0";
         if (repeatPctKpi) repeatPctKpi.innerText = "0% повторных";
         if (totalSumKpi) totalSumKpi.innerText = "0 ₸";
+        renderPaginationControls({
+            pageSizeSelectId: "clientsPageSizeSelect",
+            infoId: "clientsPaginationInfo",
+            firstBtnId: "clientsPageFirst",
+            prevBtnId: "clientsPagePrev",
+            numbersId: "clientsPageNumbers",
+            nextBtnId: "clientsPageNext",
+            lastBtnId: "clientsPageLast",
+            currentPage: 1,
+            pageSize: paginationState.clients.pageSize,
+            totalItems: 0,
+            onPageChange: () => {},
+            onPageSizeChange: () => {}
+        });
         return;
     }
 
@@ -856,7 +1111,19 @@ function renderClients(data) {
     if (!tbody) return;
     tbody.innerHTML = "";
 
-    clients.forEach(client => {
+    if (!keepPage) {
+        paginationState.clients.page = 1;
+    }
+    const pageSize = paginationState.clients.pageSize;
+    const totalPages = Math.max(1, Math.ceil(totalClients / pageSize));
+    if (paginationState.clients.page > totalPages) {
+        paginationState.clients.page = totalPages;
+    }
+    const page = paginationState.clients.page;
+    const startIndex = (page - 1) * pageSize;
+    const pagedClients = clients.slice(startIndex, startIndex + pageSize);
+
+    pagedClients.forEach(client => {
         const tr = document.createElement("tr");
         tr.style.cursor = "pointer";
         tr.onclick = (e) => {
@@ -924,6 +1191,29 @@ function renderClients(data) {
             </td>
         `;
         tbody.appendChild(tr);
+    });
+
+    // Отрисовка пагинации клиентов
+    renderPaginationControls({
+        pageSizeSelectId: "clientsPageSizeSelect",
+        infoId: "clientsPaginationInfo",
+        firstBtnId: "clientsPageFirst",
+        prevBtnId: "clientsPagePrev",
+        numbersId: "clientsPageNumbers",
+        nextBtnId: "clientsPageNext",
+        lastBtnId: "clientsPageLast",
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: totalClients,
+        onPageChange: (newPage) => {
+            paginationState.clients.page = newPage;
+            renderClients(data, true);
+        },
+        onPageSizeChange: (newSize) => {
+            paginationState.clients.pageSize = newSize;
+            paginationState.clients.page = 1;
+            renderClients(data, true);
+        }
     });
 }
 
@@ -1190,33 +1480,215 @@ function getCallChecklist(call) {
     ];
 }
 
+// Состояние модального окна звонка и плеера
+let currentOpenCallId = null;
+let currentActiveModalTab = "tab-summary";
+let currentPlaybackSpeed = 1.0;
+
 // Открытие модального окна с детальным разбором звонка
 function openCallModal(callId) {
     const call = callsData.find(c => c.id == callId);
     if (!call) return;
 
-    // Шапка
-    document.getElementById("modalCallId").innerText = `#${call.id}`;
-    document.getElementById("modalCallDate").innerText = `${call.date || ''} ${call.time || ''}`;
-    document.getElementById("modalCallDirection").innerText = call.directionLabel || (call.direction === "out" ? "Исходящий звонок" : "Входящий звонок");
-    document.getElementById("modalPhoneTitle").innerText = `${call.phone || 'Клиент'} (${call.city || 'Казахстан'})`;
+    const isDifferentCall = (currentOpenCallId !== call.id);
+    currentOpenCallId = call.id;
 
-    const editModalBtn = document.getElementById("openEditFromModalBtn");
-    if (editModalBtn) {
-        editModalBtn.onclick = () => {
-            openEditCallModal(call.id);
-        };
+    // Сразу открываем модальное окно звонка
+    const modal = document.getElementById("callModal");
+    if (modal) {
+        modal.classList.add("open");
+        modal.classList.add("active");
     }
 
+    try {
+        if (window.location.hash !== "#call-" + call.id) {
+            history.replaceState(null, "", "#call-" + call.id);
+        }
+    } catch (e) {}
+
+    try {
+        // Шапка
+        const mIdEl = document.getElementById("modalCallId");
+        if (mIdEl) mIdEl.innerText = `#${call.id}`;
+        const mDateEl = document.getElementById("modalCallDate");
+        if (mDateEl) mDateEl.innerText = `${call.date || ''} ${call.time || ''}`;
+        const mDirEl = document.getElementById("modalCallDirection");
+        if (mDirEl) mDirEl.innerText = call.directionLabel || (call.direction === "out" ? "Исходящий звонок" : "Входящий звонок");
+        const mPhoneEl = document.getElementById("modalPhoneTitle");
+        if (mPhoneEl) mPhoneEl.innerText = `${call.phone || 'Клиент'} (${call.city || 'Казахстан'})`;
+
+        const editModalBtn = document.getElementById("openEditFromModalBtn");
+        if (editModalBtn) {
+            editModalBtn.onclick = () => {
+                openEditCallModal(call.id);
+            };
+        }
+
     // Вкладка 1: Резюме
-    document.getElementById("modalSummaryText").innerText = call.summary || "Транскрипция и краткое резюме звонка.";
-    document.getElementById("modalCity").innerText = call.city || "Казахстан";
-    document.getElementById("modalProductCat").innerText = call.productCat || "Шины / Сервис";
-    document.getElementById("modalTireSize").innerText = call.tireSize || "—";
-    document.getElementById("modalSelectedBrand").innerText = call.brand || "—";
-    document.getElementById("modalOrderSum").innerText = call.orderSum || "—";
-    document.getElementById("modalOutcome").innerText = call.outcome || "Консультация проведена";
+    document.getElementById("modalSummaryText").innerText = call.callSummary || call.summary || "Транскрипция и краткое резюме звонка.";
+    
+    const clientNameEl = document.getElementById("modalClientName");
+    if (clientNameEl) clientNameEl.innerText = call.clientName || `Клиент (${call.phone || ''})`;
+
+    const carModelEl = document.getElementById("modalCarModel");
+    if (carModelEl) carModelEl.innerText = call.carModel && call.carModel !== "Не указано" ? `🚗 ${call.carModel}` : "— (Не назван)";
+
+    const cityEl = document.getElementById("modalCity");
+    if (cityEl) cityEl.innerText = call.branchAddress || (call.city ? `г. ${call.city}` : "Алматы");
+
+    const productCatEl = document.getElementById("modalProductCat");
+    if (productCatEl) productCatEl.innerText = call.tireSeason || call.productCat || "Зимние шины";
+
+    const tireSizeEl = document.getElementById("modalTireSize");
+    if (tireSizeEl) {
+        const brand = call.tireBrand || call.brand || "";
+        const size = call.tireSize || "";
+        tireSizeEl.innerText = (brand || size) ? `${brand} ${size}`.trim() : "—";
+    }
+
+    const tireCountEl = document.getElementById("modalTireCount");
+    if (tireCountEl) tireCountEl.innerText = call.tireCount || "4 шт. (комплект)";
+
+    const paymentMethodEl = document.getElementById("modalPaymentMethod");
+    if (paymentMethodEl) paymentMethodEl.innerText = call.paymentMethod || "Оплата в филиале";
+
+    const lostReasonWrap = document.getElementById("modalLostReasonWrap");
+    const lostReasonEl = document.getElementById("modalLostReason");
+    if (lostReasonWrap && lostReasonEl) {
+        if (call.lostReason && call.lostReason.trim()) {
+            lostReasonWrap.style.display = "flex";
+            lostReasonEl.innerText = call.lostReason;
+        } else {
+            lostReasonWrap.style.display = "none";
+        }
+    }
+
+    const saleStatus = call.saleStatus || call.outcome || "Консультация";
+    const isSaleWon = (saleStatus === "Продажа состоялась" || saleStatus === "Бронь оформлена");
+
+    const orderSumElModal = document.getElementById("modalOrderSum");
+    if (orderSumElModal) {
+        if (isSaleWon && call.orderSum && call.orderSum !== "0 ₸") {
+            orderSumElModal.innerText = `${call.orderSum} (Комплект)`;
+            orderSumElModal.style.color = "#34d399";
+        } else {
+            orderSumElModal.innerText = "0 ₸ (без покупки)";
+            orderSumElModal.style.color = "var(--text-secondary)";
+        }
+    }
+
+    const outcomeElModal = document.getElementById("modalOutcome");
+    if (outcomeElModal) {
+        outcomeElModal.innerText = saleStatus;
+        if (isSaleWon) {
+            outcomeElModal.className = "fact-val success";
+            outcomeElModal.style.color = "#34d399";
+        } else if (saleStatus === "Отказ от покупки") {
+            outcomeElModal.className = "fact-val";
+            outcomeElModal.style.color = "#f87171";
+        } else {
+            outcomeElModal.className = "fact-val";
+            outcomeElModal.style.color = "var(--text-secondary)";
+        }
+    }
     document.getElementById("modalOpportunityText").innerText = call.opportunity || "Предложить сопутствующие услуги.";
+
+    // Коммерческий результат и фиксация
+    const commBlockSale = document.getElementById("modalCommBlockSale");
+    const commBlockUpsell = document.getElementById("modalCommBlockUpsell");
+    const commBlockService = document.getElementById("modalCommBlockService");
+
+    const saleBadgeEl = document.getElementById("modalCommSaleBadge");
+    const orderSumEl = document.getElementById("modalCommOrderSum");
+    const productMetaEl = document.getElementById("modalCommProductMeta");
+    const upsellBadgeEl = document.getElementById("modalCommUpsellBadge");
+    const upsellSumEl = document.getElementById("modalCommUpsellSum");
+    const upsellMetaEl = document.getElementById("modalCommUpsellMeta");
+    const serviceBadgeEl = document.getElementById("modalCommServiceBadge");
+    const serviceDateEl = document.getElementById("modalCommServiceDate");
+    const serviceMetaEl = document.getElementById("modalCommServiceMeta");
+
+    // 1. Блок: Основная сделка
+    if (commBlockSale) {
+        if (isSaleWon) {
+            commBlockSale.classList.add("completed");
+        } else {
+            commBlockSale.classList.remove("completed");
+        }
+    }
+    if (saleBadgeEl) {
+        if (saleStatus === "Продажа состоялась") {
+            saleBadgeEl.className = "badge badge-success";
+            saleBadgeEl.innerText = "🟢 Продажа состоялась";
+        } else if (saleStatus === "Бронь оформлена") {
+            saleBadgeEl.className = "badge badge-success";
+            saleBadgeEl.innerText = "🟢 Бронь оформлена";
+        } else if (saleStatus === "Отказ от покупки") {
+            saleBadgeEl.className = "badge badge-outline";
+            saleBadgeEl.style.color = "#f87171";
+            saleBadgeEl.innerText = "🔴 Отказ";
+        } else {
+            saleBadgeEl.className = "badge badge-neutral";
+            saleBadgeEl.innerText = "⚪ Консультация";
+        }
+    }
+    if (orderSumEl) {
+        orderSumEl.innerText = (isSaleWon && call.orderSum && call.orderSum !== "0 ₸") ? call.orderSum : "0 ₸";
+    }
+    if (productMetaEl) {
+        if (isSaleWon) {
+            productMetaEl.innerText = `${call.tireSize || 'Шины'} • ${call.brand || 'Комплект'}`;
+        } else {
+            productMetaEl.innerText = `Консультация • ${call.tireSize || call.brand || 'Шины'}`;
+        }
+    }
+
+    // 2. Блок: Допродажа (Upsell)
+    if (commBlockUpsell) {
+        if (call.hasUpsell) {
+            commBlockUpsell.classList.add("completed");
+        } else {
+            commBlockUpsell.classList.remove("completed");
+        }
+    }
+    if (upsellBadgeEl) {
+        if (call.hasUpsell) {
+            upsellBadgeEl.className = "badge badge-success";
+            upsellBadgeEl.innerText = "🟢 Оформлена";
+        } else {
+            upsellBadgeEl.className = "badge badge-neutral";
+            upsellBadgeEl.innerText = "⚪ Не предложена";
+        }
+    }
+    if (upsellSumEl) upsellSumEl.innerText = call.hasUpsell ? (call.upsellSum || "18 000 ₸") : "0 ₸";
+    if (upsellMetaEl) upsellMetaEl.innerText = call.hasUpsell ? (call.upsellText || "Сезонное хранение шин") : "Потенциал: хранение/монтаж";
+
+    // 3. Блок: Запись на сервис
+    const sBooking = call.serviceBooking || "Нет";
+    const hasService = (sBooking && sBooking !== "Нет");
+    if (commBlockService) {
+        if (hasService) {
+            commBlockService.classList.add("completed");
+        } else {
+            commBlockService.classList.remove("completed");
+        }
+    }
+    if (serviceBadgeEl) {
+        if (hasService) {
+            serviceBadgeEl.className = "badge badge-success";
+            serviceBadgeEl.innerText = `🟢 ${sBooking}`;
+        } else {
+            serviceBadgeEl.className = "badge badge-neutral";
+            serviceBadgeEl.innerText = "⚪ Записи нет";
+        }
+    }
+    if (serviceDateEl) serviceDateEl.innerText = call.serviceDate || (hasService ? "Согласовано" : "—");
+    if (serviceMetaEl) serviceMetaEl.innerText = `Филиал: ${call.city || 'Алматы'}`;
+
+    const openOutcomeBtn = document.getElementById("openEditOutcomeFromModalBtn");
+    if (openOutcomeBtn) {
+        openOutcomeBtn.onclick = () => openEditCallModal(call.id);
+    }
 
     const csatVal = Number(call.csat) || 5;
     document.getElementById("modalCsatStars").innerText = `⭐`.repeat(csatVal) + ` ${csatVal}/5`;
@@ -1432,18 +1904,26 @@ function openCallModal(callId) {
         `;
     }
 
-    // Активируем первую вкладку
-    document.querySelectorAll(".tab-btn[data-tab]").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".tab-content").forEach(tc => tc.classList.remove("active"));
-    const firstTab = document.querySelector(".tab-btn[data-tab='tab-summary']");
-    if (firstTab) firstTab.classList.add("active");
-    const firstContent = document.getElementById("tab-summary");
-    if (firstContent) firstContent.classList.add("active");
-
-    const modal = document.getElementById("callModal");
-    if (modal) {
-        modal.classList.add("open");
-        modal.classList.add("active");
+        // Активируем вкладку: если звонок новый — первую вкладку, если фоновое обновление — текущую выбранную вкладку
+        if (isDifferentCall) {
+            currentActiveModalTab = "tab-summary";
+        }
+        document.querySelectorAll(".tab-btn[data-tab]").forEach(b => {
+            if (b.getAttribute("data-tab") === currentActiveModalTab) {
+                b.classList.add("active");
+            } else {
+                b.classList.remove("active");
+            }
+        });
+        document.querySelectorAll(".tab-content").forEach(tc => {
+            if (tc.id === currentActiveModalTab) {
+                tc.classList.add("active");
+            } else {
+                tc.classList.remove("active");
+            }
+        });
+    } catch (err) {
+        console.error("[AI CRM] Ошибка при заполнении карточки звонка:", err);
     }
 }
 
@@ -1491,11 +1971,32 @@ function initCallAudio(call, autoPlay = false) {
     currentPlayingCallId = call.id;
     audio.src = `/api/audio?call_id=${call.id}`;
     audio.currentTime = 0;
+    audio.playbackRate = currentPlaybackSpeed;
 
     if (currTimeEl) currTimeEl.innerText = "00:00";
     if (durEl) durEl.innerText = call.duration || "00:00";
     if (progressFill) progressFill.style.width = "0%";
     setPlayerBtnState(false);
+
+    // Обновляем активное состояние кнопок скорости
+    document.querySelectorAll(".audio-speed-controls .speed-btn").forEach(btn => {
+        const speedVal = parseFloat(btn.getAttribute("data-speed")) || 1.0;
+        if (Math.abs(speedVal - currentPlaybackSpeed) < 0.05) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const chosenSpeed = parseFloat(btn.getAttribute("data-speed")) || 1.0;
+            currentPlaybackSpeed = chosenSpeed;
+            if (audio) {
+                audio.playbackRate = chosenSpeed;
+            }
+            document.querySelectorAll(".audio-speed-controls .speed-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+        };
+    });
 
     audio.ontimeupdate = () => {
         if (currTimeEl) currTimeEl.innerText = formatAudioTime(audio.currentTime);
@@ -1564,15 +2065,22 @@ function stopCallAudio() {
 // Закрытие модального окна звонка
 function closeCallModal() {
     stopCallAudio();
+    currentOpenCallId = null;
+    currentActiveModalTab = "tab-summary";
     const modal = document.getElementById("callModal");
     if (modal) {
         modal.classList.remove("open");
         modal.classList.remove("active");
     }
+    try {
+        if (window.location.hash.startsWith("#call-")) {
+            history.replaceState(null, "", "#calls");
+        }
+    } catch (e) {}
 }
 
-// Рендеринг журнала аудита и изменений
-function renderAuditLogs(data) {
+// Рендеринг журнала аудита и изменений с пагинацией
+function renderAuditLogs(data, keepPage = false) {
     const tableBody = document.getElementById("auditTableBody");
     const totalEl = document.getElementById("kpiAuditTotal");
     const mgrsEl = document.getElementById("kpiAuditManagers");
@@ -1618,7 +2126,10 @@ function renderAuditLogs(data) {
         return matchesField && matchesSearch;
     });
 
-    if (filtered.length === 0) {
+    currentAuditList = filtered;
+    const totalFiltered = filtered.length;
+
+    if (totalFiltered === 0) {
         tableBody.innerHTML = `
             <tr>
                 <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">
@@ -1627,10 +2138,36 @@ function renderAuditLogs(data) {
                 </td>
             </tr>
         `;
+        renderPaginationControls({
+            pageSizeSelectId: "auditPageSizeSelect",
+            infoId: "auditPaginationInfo",
+            firstBtnId: "auditPageFirst",
+            prevBtnId: "auditPagePrev",
+            numbersId: "auditPageNumbers",
+            nextBtnId: "auditPageNext",
+            lastBtnId: "auditPageLast",
+            currentPage: 1,
+            pageSize: paginationState.audit.pageSize,
+            totalItems: 0,
+            onPageChange: () => {},
+            onPageSizeChange: () => {}
+        });
         return;
     }
 
-    filtered.forEach(l => {
+    if (!keepPage) {
+        paginationState.audit.page = 1;
+    }
+    const pageSize = paginationState.audit.pageSize;
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+    if (paginationState.audit.page > totalPages) {
+        paginationState.audit.page = totalPages;
+    }
+    const page = paginationState.audit.page;
+    const startIndex = (page - 1) * pageSize;
+    const pagedAudit = filtered.slice(startIndex, startIndex + pageSize);
+
+    pagedAudit.forEach(l => {
         const tr = document.createElement("tr");
         const isMgr = (l.fieldName === "manager_name");
         tr.innerHTML = `
@@ -1666,6 +2203,29 @@ function renderAuditLogs(data) {
             </td>
         `;
         tableBody.appendChild(tr);
+    });
+
+    // Отрисовка элементов пагинации журнала аудита
+    renderPaginationControls({
+        pageSizeSelectId: "auditPageSizeSelect",
+        infoId: "auditPaginationInfo",
+        firstBtnId: "auditPageFirst",
+        prevBtnId: "auditPagePrev",
+        numbersId: "auditPageNumbers",
+        nextBtnId: "auditPageNext",
+        lastBtnId: "auditPageLast",
+        currentPage: page,
+        pageSize: pageSize,
+        totalItems: totalFiltered,
+        onPageChange: (newPage) => {
+            paginationState.audit.page = newPage;
+            renderAuditLogs(data, true);
+        },
+        onPageSizeChange: (newSize) => {
+            paginationState.audit.pageSize = newSize;
+            paginationState.audit.page = 1;
+            renderAuditLogs(data, true);
+        }
     });
 }
 
@@ -1855,6 +2415,34 @@ function openEditCallModal(callId) {
     const commentInput = document.getElementById("editCommentInput");
     if (commentInput) commentInput.value = "";
 
+    // Заполнение коммерческих полей (продажа, допродажа, запись на услугу)
+    const saleStatusSelect = document.getElementById("editSaleStatus");
+    const orderSumInput = document.getElementById("editOrderSum");
+    const hasUpsellCheck = document.getElementById("editHasUpsell");
+    const upsellSumInput = document.getElementById("editUpsellSum");
+    const upsellTextInput = document.getElementById("editUpsellText");
+    const serviceBookingSelect = document.getElementById("editServiceBooking");
+    const serviceDateInput = document.getElementById("editServiceDate");
+
+    if (saleStatusSelect) saleStatusSelect.value = call.saleStatus || call.outcome || "Консультация";
+    if (orderSumInput) orderSumInput.value = call.orderSum || "0 ₸";
+    if (hasUpsellCheck) hasUpsellCheck.checked = Boolean(call.hasUpsell);
+    if (upsellSumInput) upsellSumInput.value = call.upsellSum || (call.hasUpsell ? "18 000 ₸" : "0 ₸");
+    if (upsellTextInput) upsellTextInput.value = call.upsellText || (call.hasUpsell ? "Сезонное хранение шин" : "");
+    if (serviceBookingSelect) {
+        const sVal = call.serviceBooking || "Нет";
+        let optFound = false;
+        for (let opt of serviceBookingSelect.options) {
+            if (opt.value === sVal) {
+                serviceBookingSelect.value = sVal;
+                optFound = true;
+                break;
+            }
+        }
+        if (!optFound) serviceBookingSelect.value = "Нет";
+    }
+    if (serviceDateInput) serviceDateInput.value = call.serviceDate || "";
+
     const alertEl = document.getElementById("editModalAlert");
     if (alertEl) {
         alertEl.style.display = "none";
@@ -1913,7 +2501,15 @@ async function saveCallEdits() {
     const cityName = (citySelect === "custom") ? cityCustom : citySelect;
 
     const changedBy = document.getElementById("editAuthorSelect").value;
-    const comment = document.getElementById("editCommentInput").value.trim() || "Ручная корректировка имени/города";
+    const comment = document.getElementById("editCommentInput").value.trim() || "Ручная корректировка данных звонка";
+
+    const saleStatus = document.getElementById("editSaleStatus")?.value || "Консультация";
+    const orderSum = document.getElementById("editOrderSum")?.value.trim() || "0 ₸";
+    const hasUpsell = document.getElementById("editHasUpsell")?.checked || false;
+    const upsellSum = document.getElementById("editUpsellSum")?.value.trim() || (hasUpsell ? "18 000 ₸" : "0 ₸");
+    const upsellText = document.getElementById("editUpsellText")?.value.trim() || (hasUpsell ? "Сезонное хранение шин" : "");
+    const serviceBooking = document.getElementById("editServiceBooking")?.value || "Нет";
+    const serviceDate = document.getElementById("editServiceDate")?.value.trim() || "";
 
     const alertEl = document.getElementById("editModalAlert");
     const saveBtn = document.getElementById("saveEditModalBtn");
@@ -1944,7 +2540,14 @@ async function saveCallEdits() {
                 manager_name: managerName,
                 city_name: cityName,
                 changed_by: changedBy,
-                comment: comment
+                comment: comment,
+                sale_status: saleStatus,
+                order_sum: orderSum,
+                has_upsell: hasUpsell,
+                upsell_sum: upsellSum,
+                upsell_text: upsellText,
+                service_booking: serviceBooking,
+                service_date: serviceDate
             })
         });
 
@@ -1984,32 +2587,64 @@ async function saveCallEdits() {
     }
 }
 
-// Загрузка реальных данных из базы данных через REST API FastAPI (/api/calls и /api/audit)
-async function loadCallsData() {
+// Загрузка реальных данных из базы данных через REST API FastAPI (/api/calls и /api/audit) с автоматическим фолбэком
+async function loadCallsData(keepPage = true) {
     try {
-        const [resCalls, resAudit] = await Promise.all([
-            fetch("/api/calls?t=" + new Date().getTime()).catch(() => fetch("calls_data.json?t=" + new Date().getTime())),
-            fetch("/api/audit?t=" + new Date().getTime()).catch(() => fetch("audit_data.json?t=" + new Date().getTime()))
-        ]);
+        let freshData = null;
+        let freshAudit = null;
 
-        if (resCalls && resCalls.ok) {
-            const freshData = await resCalls.json();
-            if (Array.isArray(freshData)) {
-                callsData = freshData;
-                renderCallsTable(callsData);
-                renderDashboard(callsData);
-                renderManagers(callsData);
-                renderClients(callsData);
-                console.log("[AI CRM] Загружены реальные звонки из PostgreSQL (FastAPI API):", callsData.length);
+        // 1. Пробуем получить звонки из REST API
+        try {
+            const resCalls = await fetch("/api/calls?t=" + Date.now());
+            if (resCalls.ok) {
+                freshData = await resCalls.json();
+            }
+        } catch (e) {
+            // Игнорируем ошибку сети для бесшовного фолбэка
+        }
+
+        // 2. Если REST API недоступен или вернул не 200 (например, при запуске через Live Server), грузим calls_data.json
+        if (!freshData || !Array.isArray(freshData) || freshData.length === 0) {
+            try {
+                const resStatic = await fetch("calls_data.json?t=" + Date.now());
+                if (resStatic.ok) {
+                    freshData = await resStatic.json();
+                }
+            } catch (e) {
+                console.error("[AI CRM] Не удалось загрузить calls_data.json:", e);
             }
         }
 
-        if (resAudit && resAudit.ok) {
-            const freshAudit = await resAudit.json();
-            if (Array.isArray(freshAudit)) {
-                auditLogsData = freshAudit;
-                renderAuditLogs(auditLogsData);
+        if (Array.isArray(freshData) && freshData.length > 0) {
+            callsData = freshData;
+            renderCallsTable(callsData, keepPage);
+            renderDashboard(callsData);
+            renderManagers(callsData, keepPage);
+            renderClients(callsData, keepPage);
+            console.log("[AI CRM] Загружены актуальные звонки (всего:", callsData.length, ")");
+            checkUrlCallHash();
+        }
+
+        // 3. Журнал аудита (REST API -> audit_data.json)
+        try {
+            const resAudit = await fetch("/api/audit?t=" + Date.now());
+            if (resAudit.ok) {
+                freshAudit = await resAudit.json();
             }
+        } catch (e) {}
+
+        if (!freshAudit || !Array.isArray(freshAudit)) {
+            try {
+                const resAuditStatic = await fetch("audit_data.json?t=" + Date.now());
+                if (resAuditStatic.ok) {
+                    freshAudit = await resAuditStatic.json();
+                }
+            } catch (e) {}
+        }
+
+        if (Array.isArray(freshAudit)) {
+            auditLogsData = freshAudit;
+            renderAuditLogs(auditLogsData, keepPage);
         }
     } catch (err) {
         console.warn("[AI CRM] Ошибка загрузки данных:", err);
@@ -2018,6 +2653,26 @@ async function loadCallsData() {
 
 // Инициализация событий
 document.addEventListener("DOMContentLoaded", () => {
+    // Сворачивание / разворачивание бокового меню с сохранением состояния в localStorage
+    const sidebar = document.getElementById("sidebar");
+    const toggleBtn = document.getElementById("sidebarToggleBtn");
+
+    if (localStorage.getItem("sidebar_collapsed") === "true" && sidebar) {
+        sidebar.classList.add("collapsed");
+    }
+
+    function toggleSidebar() {
+        if (!sidebar) return;
+        sidebar.classList.toggle("collapsed");
+        const isCollapsed = sidebar.classList.contains("collapsed");
+        localStorage.setItem("sidebar_collapsed", isCollapsed ? "true" : "false");
+        if (toggleBtn) {
+            toggleBtn.title = isCollapsed ? "Развернуть панель" : "Свернуть панель";
+        }
+    }
+
+    if (toggleBtn) toggleBtn.onclick = toggleSidebar;
+
     // Навигация по боковому меню (Журнал звонков / Дашборд качества / Менеджеры / Клиенты)
     document.querySelectorAll(".nav-menu .nav-item").forEach(item => {
         item.onclick = (e) => {
@@ -2028,6 +2683,24 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         };
     });
+
+    // Автоматическое открытие звонка по URL хэшу (#call-41)
+    function checkUrlCallHash() {
+        const hash = window.location.hash || "";
+        const m = hash.match(/call-(\d+)/);
+        if (m && callsData && callsData.length > 0) {
+            const cId = parseInt(m[1], 10);
+            if (currentOpenCallId === cId) {
+                // Модальное окно этого звонка уже открыто, не перерисовываем заново
+                return;
+            }
+            if (callsData.some(c => c.id === cId)) {
+                openCallModal(cId);
+            }
+        }
+    }
+    window.checkUrlCallHash = checkUrlCallHash;
+    window.onhashchange = checkUrlCallHash;
 
     // Загружаем реальные данные из БД
     loadCallsData();
@@ -2084,11 +2757,13 @@ document.addEventListener("DOMContentLoaded", () => {
     // Переключение вкладок модалки звонка
     document.querySelectorAll(".tab-btn[data-tab]").forEach(btn => {
         btn.onclick = () => {
+            const targetTab = btn.getAttribute("data-tab");
+            currentActiveModalTab = targetTab;
+
             document.querySelectorAll(".tab-btn[data-tab]").forEach(b => b.classList.remove("active"));
             document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
 
             btn.classList.add("active");
-            const targetTab = btn.getAttribute("data-tab");
             const tabContent = document.getElementById(targetTab);
             if (tabContent) tabContent.classList.add("active");
         };
@@ -2123,12 +2798,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // Единая функция фильтрации звонков
     function applyCallsFilters() {
         const searchInput = document.getElementById("searchInput");
+        const outcomeFilter = document.getElementById("outcomeFilter");
         const emotionFilter = document.getElementById("emotionFilter");
         const scoreFilter = document.getElementById("scoreFilter");
         const activeBadgeBar = document.getElementById("activeFilterBadgeBar");
         const activeText = document.getElementById("activeFilterText");
 
         const searchVal = (searchInput?.value || "").toLowerCase().trim();
+        const outcomeVal = outcomeFilter?.value || "all";
         const emotionVal = emotionFilter?.value || "all";
         const scoreVal = scoreFilter?.value || "all";
 
@@ -2141,11 +2818,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 (c.topic && c.topic.toLowerCase().includes(searchVal)) ||
                 (c.city && c.city.toLowerCase().includes(searchVal)) ||
                 (c.manager && c.manager.toLowerCase().includes(searchVal)) ||
-                (c.summary && c.summary.toLowerCase().includes(searchVal))
+                (c.summary && c.summary.toLowerCase().includes(searchVal)) ||
+                (c.saleStatus && c.saleStatus.toLowerCase().includes(searchVal)) ||
+                (c.serviceBooking && c.serviceBooking.toLowerCase().includes(searchVal))
             );
         }
 
-        // 2. Фильтр эмоций / конфликтов
+        // 2. Фильтр по коммерческому результату (продажи / услуги)
+        if (outcomeVal === "sale") {
+            filtered = filtered.filter(c => c.saleStatus === "Продажа состоялась" || c.saleStatus === "Бронь оформлена");
+        } else if (outcomeVal === "upsell") {
+            filtered = filtered.filter(c => c.hasUpsell === true);
+        } else if (outcomeVal === "service") {
+            filtered = filtered.filter(c => c.serviceBooking && c.serviceBooking !== "Нет");
+        } else if (outcomeVal === "consultation") {
+            filtered = filtered.filter(c => c.saleStatus === "Консультация");
+        }
+
+        // 3. Фильтр эмоций / конфликтов
         if (emotionVal === "conflict") {
             filtered = filtered.filter(c => 
                 c.conflict === true || 
@@ -2168,7 +2858,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (activeBadgeBar) activeBadgeBar.style.display = "none";
         }
 
-        // 3. Фильтр по оценке CSAT
+        // 4. Фильтр по оценке CSAT
         if (scoreVal === "2") {
             filtered = filtered.filter(c => Number(c.csat) <= 2);
         } else if (scoreVal !== "all") {
@@ -2228,6 +2918,12 @@ document.addEventListener("DOMContentLoaded", () => {
         searchInput.oninput = applyCallsFilters;
     }
 
+    // Фильтр по коммерческому результату (сделки / услуги)
+    const outcomeFilter = document.getElementById("outcomeFilter");
+    if (outcomeFilter) {
+        outcomeFilter.onchange = applyCallsFilters;
+    }
+
     // Фильтр по эмоциям
     const emotionFilter = document.getElementById("emotionFilter");
     if (emotionFilter) {
@@ -2240,56 +2936,58 @@ document.addEventListener("DOMContentLoaded", () => {
         scoreFilter.onchange = applyCallsFilters;
     }
 
+    // Единая фильтрация и поиск клиентов со сбросом пагинации на 1 страницу
+    function applyClientsFilters() {
+        const searchVal = (document.getElementById("clientsSearchInput")?.value || "").toLowerCase().trim();
+        const cityVal = document.getElementById("clientsCityFilter")?.value || "all";
+        const typeVal = document.getElementById("clientsTypeFilter")?.value || "all";
+
+        let filtered = callsData;
+
+        if (searchVal) {
+            filtered = filtered.filter(c => 
+                (c.phone && c.phone.toLowerCase().includes(searchVal)) ||
+                (c.topic && c.topic.toLowerCase().includes(searchVal)) ||
+                (c.city && c.city.toLowerCase().includes(searchVal)) ||
+                (c.tireSize && c.tireSize.toLowerCase().includes(searchVal)) ||
+                (c.brand && c.brand.toLowerCase().includes(searchVal)) ||
+                (c.summary && c.summary.toLowerCase().includes(searchVal))
+            );
+        }
+
+        if (cityVal !== "all") {
+            filtered = filtered.filter(c => c.city === cityVal);
+        }
+
+        if (typeVal !== "all") {
+            const clientCounts = {};
+            callsData.forEach(c => { clientCounts[c.phone] = (clientCounts[c.phone] || 0) + 1; });
+            if (typeVal === "repeat") {
+                filtered = filtered.filter(c => clientCounts[c.phone] > 1);
+            } else if (typeVal === "single") {
+                filtered = filtered.filter(c => clientCounts[c.phone] === 1);
+            }
+        }
+
+        renderClients(filtered, false);
+    }
+
     // Поиск по клиентам
     const clientsSearchInput = document.getElementById("clientsSearchInput");
     if (clientsSearchInput) {
-        clientsSearchInput.oninput = (e) => {
-            const val = e.target.value.toLowerCase().trim();
-            const filtered = callsData.filter(c => 
-                (c.phone && c.phone.toLowerCase().includes(val)) ||
-                (c.topic && c.topic.toLowerCase().includes(val)) ||
-                (c.city && c.city.toLowerCase().includes(val)) ||
-                (c.tireSize && c.tireSize.toLowerCase().includes(val)) ||
-                (c.brand && c.brand.toLowerCase().includes(val)) ||
-                (c.summary && c.summary.toLowerCase().includes(val))
-            );
-            renderClients(filtered);
-        };
+        clientsSearchInput.oninput = applyClientsFilters;
     }
 
     // Фильтр клиентов по городу
     const clientsCityFilter = document.getElementById("clientsCityFilter");
     if (clientsCityFilter) {
-        clientsCityFilter.onchange = (e) => {
-            const val = e.target.value;
-            if (val === "all") {
-                renderClients(callsData);
-            } else {
-                const filtered = callsData.filter(c => c.city === val);
-                renderClients(filtered);
-            }
-        };
+        clientsCityFilter.onchange = applyClientsFilters;
     }
 
     // Фильтр клиентов по частоте
     const clientsTypeFilter = document.getElementById("clientsTypeFilter");
     if (clientsTypeFilter) {
-        clientsTypeFilter.onchange = (e) => {
-            const val = e.target.value;
-            if (val === "all") {
-                renderClients(callsData);
-            } else if (val === "repeat") {
-                const clientCounts = {};
-                callsData.forEach(c => { clientCounts[c.phone] = (clientCounts[c.phone] || 0) + 1; });
-                const filtered = callsData.filter(c => clientCounts[c.phone] > 1);
-                renderClients(filtered);
-            } else {
-                const clientCounts = {};
-                callsData.forEach(c => { clientCounts[c.phone] = (clientCounts[c.phone] || 0) + 1; });
-                const filtered = callsData.filter(c => clientCounts[c.phone] === 1);
-                renderClients(filtered);
-            }
-        };
+        clientsTypeFilter.onchange = applyClientsFilters;
     }
 
     // Закрытие модального окна редактирования
@@ -2339,26 +3037,26 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
-    // Поиск по журналу аудита
+    // Поиск по журналу аудита (сброс на 1 страницу)
     const auditSearchInput = document.getElementById("auditSearchInput");
     if (auditSearchInput) {
-        auditSearchInput.oninput = () => renderAuditLogs(auditLogsData);
+        auditSearchInput.oninput = () => renderAuditLogs(auditLogsData, false);
     }
 
-    // Фильтр по полям аудита
+    // Фильтр по полям аудита (сброс на 1 страницу)
     const auditFieldFilter = document.getElementById("auditFieldFilter");
     if (auditFieldFilter) {
-        auditFieldFilter.onchange = () => renderAuditLogs(auditLogsData);
+        auditFieldFilter.onchange = () => renderAuditLogs(auditLogsData, false);
     }
 
     // Кнопка "Обновить"
     const refreshBtn = document.getElementById("refreshBtn");
     if (refreshBtn) {
         refreshBtn.onclick = () => {
-            loadCallsData();
+            loadCallsData(true);
         };
     }
 
-    // Периодическое автообновление каждые 6 секунд
-    setInterval(loadCallsData, 6000);
+    // Периодическое автообновление каждые 6 секунд с сохранением текущей страницы
+    setInterval(() => loadCallsData(true), 6000);
 });

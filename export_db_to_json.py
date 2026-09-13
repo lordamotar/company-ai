@@ -136,7 +136,9 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 t.text, t.source_file, t.status, t.manager_name, t.city_name, t.duration_sec,
                 af.mean_rms, af.max_rms, af.loud_moments_pct, af.silent_duration_sec, af.silence_pct, af.speech_tempo, af.active_speech_sec,
                 ae.dominant_emotion, ae.confidence as emotion_conf, ae.happy_score, ae.neutral_score, ae.sad_score, ae.angry_score,
-                cs.customer_sentiment_start, cs.customer_sentiment_end, cs.satisfaction_score, cs.manager_politeness, cs.conflict_detected, cs.conflict_reason, cs.tone_summary
+                cs.customer_sentiment_start, cs.customer_sentiment_end, cs.satisfaction_score, cs.manager_politeness, cs.conflict_detected, cs.conflict_reason, cs.tone_summary,
+                t.sale_status, t.order_sum, t.has_upsell, t.upsell_sum, t.upsell_text, t.service_booking, t.service_date,
+                t.client_name, t.car_model, t.tire_brand, t.tire_size, t.tire_season, t.tire_count, t.branch_address, t.payment_method, t.lost_reason, t.call_summary
             FROM call_transcriptions t
             LEFT JOIN call_audio_features af ON t.id = af.call_id
             LEFT JOIN call_audio_emotions ae ON t.id = ae.call_id
@@ -178,6 +180,14 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             manager_politeness = int(r[27]) if r[27] is not None else 5
             conflict = bool(r[28]) if r[28] is not None else False
             summary = r[30] if len(r) > 30 and r[30] else (raw_text[:200] + "..." if raw_text else "Транскрипция звонка.")
+
+            sale_status = r[31] if len(r) > 31 and r[31] else "Консультация"
+            order_sum = r[32] if len(r) > 32 and r[32] else "0 ₸"
+            has_upsell = bool(r[33]) if len(r) > 33 and r[33] is not None else False
+            upsell_sum = r[34] if len(r) > 34 and r[34] else "0 ₸"
+            upsell_text = r[35] if len(r) > 35 and r[35] else ""
+            service_booking = r[36] if len(r) > 36 and r[36] else "Нет"
+            service_date = r[37] if len(r) > 37 and r[37] else ""
 
             emotion_class = "happy"
             if dominant_emotion in ["Нейтральный", "neu", "neutral"]:
@@ -239,10 +249,24 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                         "sentiment": "neutral"
                     })
 
+            db_client_name = r[38] if len(r) > 38 and r[38] else None
+            db_car_model = r[39] if len(r) > 39 and r[39] else None
+            db_tire_brand = r[40] if len(r) > 40 and r[40] else None
+            db_tire_size = r[41] if len(r) > 41 and r[41] else None
+            db_tire_season = r[42] if len(r) > 42 and r[42] else None
+            db_tire_count = r[43] if len(r) > 43 and r[43] else None
+            db_branch_address = r[44] if len(r) > 44 and r[44] else None
+            db_payment_method = r[45] if len(r) > 45 and r[45] else None
+            db_lost_reason = r[46] if len(r) > 46 and r[46] else None
+            db_call_summary = r[47] if len(r) > 47 and r[47] else None
+
             manager_name = db_manager if db_manager else detect_manager_name(raw_text)
             city_name = db_city if db_city else detect_city(raw_text)
-            brand_name, tire_size_str = detect_tire_details(raw_text)
+            det_brand, det_size = detect_tire_details(raw_text)
+            brand_name = db_tire_brand or det_brand
+            tire_size_str = db_tire_size or det_size
             topic_str = f"{brand_name} {tire_size_str}" if brand_name else "Консультация по шинам"
+            client_name = db_client_name or (f"Клиент (+..{phone[-4:]})" if phone and len(phone) >= 4 else "Клиент")
 
             if db_duration_sec and db_duration_sec > 0:
                 total_sec = db_duration_sec
@@ -329,13 +353,27 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 "duration": duration_str,
                 "durationSec": total_sec,
                 "manager": manager_name,
+                "clientName": client_name,
+                "carModel": db_car_model or "Не указано",
+                "tireBrand": brand_name,
+                "tireSize": tire_size_str,
+                "tireSeason": db_tire_season or "Зимние шины",
+                "tireCount": db_tire_count or "4 шт.",
+                "branchAddress": db_branch_address or (f"г. {city_name}" if city_name else "Филиал Aikos"),
+                "paymentMethod": db_payment_method or "Оплата при получении",
+                "lostReason": db_lost_reason or "",
+                "callSummary": db_call_summary or summary,
                 "topic": topic_str,
                 "city": city_name,
-                "productCat": "Зимние шины",
-                "tireSize": tire_size_str,
-                "brand": brand_name,
-                "orderSum": "87 000 ₸",
-                "outcome": "Консультация проведена",
+                "productCat": db_tire_season or "Зимние шины",
+                "orderSum": order_sum,
+                "outcome": sale_status,
+                "saleStatus": sale_status,
+                "hasUpsell": has_upsell,
+                "upsellSum": upsell_sum,
+                "upsellText": upsell_text,
+                "serviceBooking": service_booking,
+                "serviceDate": service_date,
                 "emotion": dominant_emotion,
                 "emotionPct": f"{emotion_conf:.1f}%",
                 "emotionClass": emotion_class,

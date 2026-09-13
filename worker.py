@@ -221,12 +221,16 @@ def save_to_database(data, filename, text):
     return inserted_id
 
 
-# Функция проверки, обрабатывался ли файл ранее по его уникальному ID
-def is_already_processed(unique_id):
+# Функция проверки, обрабатывался ли файл ранее по его уникальному ID или имени файла
+def is_already_processed(unique_id, filename=None):
     connection = psycopg2.connect(**DB_CONFIG)
     cursor = connection.cursor()
-    query = "SELECT text FROM call_transcriptions WHERE unique_id = %s;"
-    cursor.execute(query, (unique_id,))
+    if filename:
+        query = "SELECT text FROM call_transcriptions WHERE unique_id = %s OR source_file = %s;"
+        cursor.execute(query, (unique_id, filename))
+    else:
+        query = "SELECT text FROM call_transcriptions WHERE unique_id = %s;"
+        cursor.execute(query, (unique_id,))
     result = cursor.fetchone()
     cursor.close()
     connection.close()
@@ -295,7 +299,7 @@ def transcribe_with_gemini(file_path, output_txt_path=None):
         "Пиши точно на том языке, на котором говорят участники (казахский/русский), не переводи и не добавляй вводных слов от себя, верни только диалог."
     )
 
-    models_to_try = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"]
+    models_to_try = ["gemini-3.6-flash", "gemini-2.5-flash"]
     text = None
 
     for model_name in models_to_try:
@@ -343,10 +347,10 @@ def process_file(file_path):
 
     try:
         # 1. Извлекаем метаданные из имени файла (телефон, дата, время, ID)
-        data = parse_filename(filename)
+        data = parse_filename(filename, file_path=file_path)
         
         # 2. Проверяем в БД, обрабатывали ли мы этот файл ранее
-        if is_already_processed(data["unique_id"]):
+        if is_already_processed(data["unique_id"], filename=filename):
             logging.info(f"Файл {filename} уже был успешно обработан ранее. Пропускаем.")
             return
 
