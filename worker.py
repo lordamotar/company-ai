@@ -247,24 +247,60 @@ def is_already_processed(unique_id, filename=None):
     return True
 
 
-def transcribe_with_gemini(file_path, output_txt_path=None):
+def get_gemini_api_keys():
     from dotenv import load_dotenv
     load_dotenv()
     
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("Переменная GEMINI_API_KEY не найдена в файле .env")
+    # 1. Сначала проверяем список ключей через запятую/точку с запятой в GEMINI_API_KEYS
+    keys_raw = os.environ.get("GEMINI_API_KEYS", "")
+    keys = [k.strip().strip('"').strip("'") for k in re.split(r"[,;\n]+", keys_raw) if k.strip()]
+    
+    # 2. Если нет списка, проверяем одиночный ключ GEMINI_API_KEY
+    if not keys:
+        single_key = os.environ.get("GEMINI_API_KEY", "").strip().strip('"').strip("'")
+        if single_key:
+            keys.append(single_key)
+            
+    # 3. Также ищем пронумерованные ключи GEMINI_API_KEY_1, GEMINI_API_KEY_2 и т.д.
+    for i in range(1, 10):
+        k = os.environ.get(f"GEMINI_API_KEY_{i}", "").strip().strip('"').strip("'")
+        if k and k not in keys:
+            keys.append(k)
 
+    return keys
+
+
+# Глобальный указатель текущего активного ключа
+_current_gemini_key_idx = 0
+
+def get_current_gemini_key():
+    global _current_gemini_key_idx
+    keys = get_gemini_api_keys()
+    if not keys:
+        raise ValueError("API-ключ Google Gemini не найден в .env (укажите GEMINI_API_KEY или GEMINI_API_KEYS через запятую)")
+    return keys[_current_gemini_key_idx % len(keys)]
+
+def rotate_gemini_key():
+    global _current_gemini_key_idx
+    keys = get_gemini_api_keys()
+    if len(keys) <= 1:
+        return None
+    _current_gemini_key_idx = (_current_gemini_key_idx + 1) % len(keys)
+    next_key = keys[_current_gemini_key_idx]
+    masked = next_key[:6] + "..." + next_key[-4:] if len(next_key) > 10 else "***"
+    logging.info(f"Смена API-ключа Gemini на ключ №{_current_gemini_key_idx + 1} ({masked})")
+    return next_key
+
+
+def transcribe_with_gemini(file_path, output_txt_path=None):
     from google import genai
-    client = genai.Client(api_key=api_key)
 
     abs_path = os.path.abspath(file_path)
     if not os.path.exists(abs_path):
         raise FileNotFoundError(f"Файл не найден: {abs_path}")
 
     filename = os.path.basename(abs_path)
-    logging.info(f"Загрузка аудиофайла {filename} на серверы Google Gemini...")
-
+    
     # Защита от UnicodeEncodeError в заголовках httpx для файлов с кириллицей
     temp_upload_path = None
     try:
@@ -279,17 +315,6 @@ def transcribe_with_gemini(file_path, output_txt_path=None):
         shutil.copy2(abs_path, temp_upload_path)
         upload_path = temp_upload_path
 
-    try:
-        audio_file = client.files.upload(file=upload_path)
-    finally:
-        if temp_upload_path and os.path.exists(temp_upload_path):
-            try:
-                os.remove(temp_upload_path)
-            except Exception:
-                pass
-
-    logging.info(f"Файл {filename} загружен в Gemini API. Имя объекта: {audio_file.name}")
-
     prompt = (
         "Сделай точную построчную транскрипцию этого телефонного разговора. "
         "Язык разговора может быть казахским, русским или смешанным (казахский + русский). "
@@ -299,34 +324,70 @@ def transcribe_with_gemini(file_path, output_txt_path=None):
         "Пиши точно на том языке, на котором говорят участники (казахский/русский), не переводи и не добавляй вводных слов от себя, верни только диалог."
     )
 
-    models_to_try = ["gemini-3.6-flash", "gemini-2.5-flash"]
+    models_to_try = ["gemini-3.6-flash", "gemini-2.5-pro", "gemini-2.5-flash-preview"]
     text = None
 
-    for model_name in models_to_try:
+    keys = get_gemini_api_keys()
+    max_key_attempts = max(1, len(keys))
+
+    for key_attempt in range(max_key_attempts):
+        current_key = get_current_gemini_key()
+        client = genai.Client(api_key=current_key)
+        audio_file = None
+
         try:
-            logging.info(f"Вызов Gemini API ({model_name}) для транскрибации...")
-            response = client.models.generate_content(
-                model=model_name,
-                contents=[audio_file, prompt]
-            )
-            text = response.text.strip()
+            logging.info(f"Загрузка аудиофайла {filename} на серверы Google Gemini (Ключ #{_current_gemini_key_idx + 1})...")
+            audio_file = client.files.upload(file=upload_path)
+            logging.info(f"Файл {filename} загружен в Gemini API. Имя объекта: {audio_file.name}")
+
+            for model_name in models_to_try:
+                try:
+                    logging.info(f"Вызов Gemini API ({model_name}) для транскрибации...")
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=[audio_file, prompt]
+                    )
+                    text = response.text.strip() if response and response.text else None
+                    if text:
+                        logging.info(f"Успешный ответ от {model_name}.")
+                        break
+                except Exception as e:
+                    err_msg = str(e)
+                    logging.warning(f"Ошибка при вызове {model_name}: {err_msg[:120]}")
+                    if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                        raise e  # перехватим во внешнем блоке для ротации ключа
+                    time.sleep(1)
+
             if text:
-                logging.info(f"Успешный ответ от {model_name}.")
                 break
+
         except Exception as e:
             err_msg = str(e)
-            logging.warning(f"Ошибка при вызове {model_name}: {err_msg[:120]}")
             if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-                logging.info(f"Переключение на следующую доступную модель...")
-                time.sleep(2)
+                logging.warning(f"Лимит квоты (429) исчерпан на ключе #{_current_gemini_key_idx + 1}.")
+                if len(keys) > 1 and key_attempt < max_key_attempts - 1:
+                    rotate_gemini_key()
+                    time.sleep(1)
+                    continue
+                else:
+                    logging.error("Все доступные ключи Gemini исчерпали лимит (429).")
+                    raise e
             else:
-                time.sleep(1)
+                logging.error(f"Непредвиденная ошибка Gemini API: {err_msg[:120]}")
+                raise e
 
-    # Удаляем временный файл на сервере Google
-    try:
-        client.files.delete(name=audio_file.name)
-    except Exception:
-        pass
+        finally:
+            if audio_file:
+                try:
+                    client.files.delete(name=audio_file.name)
+                except Exception:
+                    pass
+
+    if temp_upload_path and os.path.exists(temp_upload_path):
+        try:
+            os.remove(temp_upload_path)
+        except Exception:
+            pass
 
     if not text:
         raise RuntimeError("Не удалось получить транскрипцию от Gemini API.")
@@ -416,17 +477,41 @@ def main():
 
     logging.info(f"Отслеживается папка: {INCOMING_DIR}")
 
-    # Обработка уже существующих файлов в папке incoming при старте скрипта
+    # Быстрая проверка наличия необработанных файлов в папке incoming (выполняется одним быстрым SQL-запросом)
     try:
         existing_files = os.listdir(INCOMING_DIR)
-        files = [f for f in existing_files if os.path.splitext(f)[1].lower() in AUDIO_EXTENSIONS]
-        if files:
-            logging.info(f"Найдено существующих аудиофайлов при старте: {len(files)}")
-            for file_name in files:
-                file_path = os.path.join(INCOMING_DIR, file_name)
-                process_file(file_path)
+        audio_files = [f for f in existing_files if os.path.splitext(f)[1].lower() in AUDIO_EXTENSIONS]
+        if audio_files:
+            # Получаем все уже обработанные файлы и уникальные id из БД одним запросом
+            conn = psycopg2.connect(**DB_CONFIG)
+            cur = conn.cursor()
+            cur.execute("SELECT unique_id, source_file FROM call_transcriptions WHERE text IS NOT NULL AND text != 'ТЕСТОВАЯ ТРАНСКРИБАЦИЯ';")
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+
+            processed_sources = {r[1] for r in rows if r[1]}
+            processed_uids = {r[0] for r in rows if r[0]}
+
+            unprocessed_files = []
+            for fname in audio_files:
+                if fname in processed_sources:
+                    continue
+                try:
+                    parsed = parse_filename(fname)
+                    if parsed.get("unique_id") in processed_uids:
+                        continue
+                except Exception:
+                    pass
+                unprocessed_files.append(fname)
+
+            if unprocessed_files:
+                logging.info(f"Найдено необработанных файлов в папке incoming: {len(unprocessed_files)}. Начинаем обработку...")
+                for file_name in unprocessed_files:
+                    file_path = os.path.join(INCOMING_DIR, file_name)
+                    process_file(file_path)
     except Exception as e:
-        logging.error(f"Ошибка при сканировании папки входящих файлов при старте: {e}")
+        logging.error(f"Ошибка при быстрой проверке необработанных файлов: {e}")
 
     # Инициализируем watchdog для отслеживания событий создания файлов в реальном времени
     event_handler = MP3Handler()

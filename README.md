@@ -102,3 +102,24 @@ docker compose up -d
 ```powershell
 .venv\Scripts\python dialog_processor.py --watch
 ```
+
+---
+
+## Yandex DataLens (BI-дашборды)
+
+Для развертывания DataLens и построения отчетов поверх базы PostgreSQL проекта:
+
+### Запуск DataLens
+```powershell
+.\start-datalens.ps1
+```
+*(или `start-datalens.bat`)*
+
+Интерфейс DataLens будет доступен по адресу: **`http://localhost:8088`** *(порт изменен с 8080 на 8088 во избежание конфликта с `company-web`)*.
+
+### Подключение DataLens к PostgreSQL проекта:
+* **Хост**: `host.docker.internal`
+* **Порт**: `5433`
+* **Имя БД**: `company`
+* **Пользователь**: `company_user`
+* **Пароль**: `company_password`

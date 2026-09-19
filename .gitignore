@@ -1,7 +1,7 @@
-other/
-img/
-scratch/
+
 .agents/
+.venv/
+.tech/
 .chrome-debug/
 .chrome-debug-profile/
 .gstack/
@@ -12,8 +12,9 @@ version/
 *.txt
 !requirements*.txt
 *.md
-.venv/
-.tech/
+other/
+img/
+scratch/
 incoming/
 processed/
 dialog/
@@ -28,3 +29,4 @@ n8n_data/
 frontend/*.json
 html/*.json
 call/
+datalens/

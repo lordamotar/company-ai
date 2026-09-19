@@ -464,22 +464,44 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
     
     content = None
     
-    # 1. Пробуем через актуальный Gemini API (Google)
-    if gemini_key:
+    # 1. Пробуем через актуальный Gemini API (Google) с поддержкой пула ключей
+    from worker import get_gemini_api_keys, get_current_gemini_key, rotate_gemini_key
+    keys = get_gemini_api_keys()
+    
+    if keys:
         from google import genai
-        client = genai.Client(api_key=gemini_key)
-        for model_name in ["gemini-3.6-flash", "gemini-2.5-flash"]:
-            try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt
-                )
-                content = response.text.strip()
-                if content:
-                    break
-            except Exception as e:
-                logging.warning(f"[Тон 5] Ошибка при вызове {model_name}: {str(e)[:120]}")
+        max_attempts = max(1, len(keys))
+        for attempt in range(max_attempts):
+            curr_key = get_current_gemini_key()
+            client = genai.Client(api_key=curr_key)
+            is_quota_error = False
+            
+            for model_name in ["gemini-3.6-flash", "gemini-2.5-pro", "gemini-2.5-flash-preview"]:
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt
+                    )
+                    if response and response.text:
+                        content = response.text.strip()
+                        break
+                except Exception as e:
+                    err_msg = str(e)
+                    logging.warning(f"[Тон 5] Ошибка при вызове {model_name}: {err_msg[:120]}")
+                    if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                        is_quota_error = True
+                        break
+                    time.sleep(1)
+
+            if content:
+                break
+                
+            if is_quota_error and len(keys) > 1 and attempt < max_attempts - 1:
+                logging.info("[Тон 5] Смена ключа Gemini из-за исчерпания квоты (429)...")
+                rotate_gemini_key()
                 time.sleep(1)
+            else:
+                break
             
     # 2. Если не получилось, пробуем через OpenRouter
     if not content and openrouter_key:
