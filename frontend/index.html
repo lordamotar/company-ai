@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.8">
+    <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 <body>
     <div class="app-container">
@@ -150,6 +150,16 @@
                     </div>
 
                     <div class="filter-group">
+                        <select id="categoryFilter" class="filter-select">
+                            <option value="all">Все категории звонков</option>
+                            <option value="Запись на шиномонтаж">🛠️ Запись на шиномонтаж</option>
+                            <option value="Подбор и бронь шин">🛒 Подбор и бронь шин</option>
+                            <option value="Инфо: Адрес / Время">📍 Инфо: Адрес / Время</option>
+                            <option value="Статус заказа">📦 Статус заказа</option>
+                            <option value="Рекламация / Претензия">⚠️ Рекламация / Претензия</option>
+                            <option value="Прочее / Консультация">💬 Прочее / Консультация</option>
+                        </select>
+
                         <select id="outcomeFilter" class="filter-select">
                             <option value="all">Все сделки и услуги</option>
                             <option value="sale">🟢 Продажи и брони</option>
@@ -193,12 +203,12 @@
                                 <th>ID & Время</th>
                                 <th>Клиент</th>
                                 <th>Менеджер</th>
+                                <th>Категория / Цель</th>
                                 <th>Результат звонка</th>
                                 <th>Тема / Товары</th>
                                 <th>Длительность</th>
                                 <th>Тон голоса (Wav2Vec2)</th>
                                 <th>CSAT AI</th>
-                                <th>Статус</th>
                                 <th class="text-right">Действие</th>
                             </tr>
                         </thead>
@@ -615,6 +625,10 @@
                             
                             <div class="key-facts-grid">
                                 <div class="fact-item">
+                                    <span class="fact-label">Категория / Цель</span>
+                                    <span class="fact-val highlight" id="modalCallCategory">Подбор и бронь шин</span>
+                                </div>
+                                <div class="fact-item">
                                     <span class="fact-label">Клиент</span>
                                     <span class="fact-val highlight" id="modalClientName">Клиент</span>
                                 </div>
@@ -631,8 +645,12 @@
                                     <span class="fact-val" id="modalProductCat">Зимние шины</span>
                                 </div>
                                 <div class="fact-item">
-                                    <span class="fact-label">Бренд & Размер</span>
-                                    <span class="fact-val" id="modalTireSize">205/55 R16</span>
+                                    <span class="fact-label">Бренд шин / дисков</span>
+                                    <span class="fact-val highlight" id="modalTireBrand">—</span>
+                                </div>
+                                <div class="fact-item">
+                                    <span class="fact-label">Типоразмер</span>
+                                    <span class="fact-val highlight" id="modalTireSize">—</span>
                                 </div>
                                 <div class="fact-item">
                                     <span class="fact-label">Количество</span>
@@ -1265,6 +1283,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=1.8"></script>
+    <script src="app.js?v=4.0"></script>
 </body>
 </html>

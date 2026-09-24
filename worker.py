@@ -324,7 +324,7 @@ def transcribe_with_gemini(file_path, output_txt_path=None):
         "Пиши точно на том языке, на котором говорят участники (казахский/русский), не переводи и не добавляй вводных слов от себя, верни только диалог."
     )
 
-    models_to_try = ["gemini-3.6-flash", "gemini-2.5-pro", "gemini-2.5-flash-preview"]
+    models_to_try = ["gemini-3.6-flash", "gemini-3.6-pro", "gemini-2.5-pro", "gemini-2.5-flash"]
     text = None
 
     keys = get_gemini_api_keys()
@@ -341,22 +341,28 @@ def transcribe_with_gemini(file_path, output_txt_path=None):
             logging.info(f"Файл {filename} загружен в Gemini API. Имя объекта: {audio_file.name}")
 
             for model_name in models_to_try:
-                try:
-                    logging.info(f"Вызов Gemini API ({model_name}) для транскрибации...")
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=[audio_file, prompt]
-                    )
-                    text = response.text.strip() if response and response.text else None
-                    if text:
-                        logging.info(f"Успешный ответ от {model_name}.")
+                for retry in range(5):
+                    try:
+                        logging.info(f"Вызов Gemini API ({model_name}) для транскрибации (попытка {retry + 1}/5)...")
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=[audio_file, prompt]
+                        )
+                        text = response.text.strip() if response and response.text else None
+                        if text:
+                            logging.info(f"Успешный ответ высокого качества от {model_name}.")
+                            break
+                    except Exception as e:
+                        err_msg = str(e)
+                        logging.warning(f"Ошибка при вызове {model_name} (попытка {retry + 1}/5): {err_msg[:120]}")
+                        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                            raise e  # перехватим во внешнем блоке для ротации ключа
+                        if "503" in err_msg or "UNAVAILABLE" in err_msg or "500" in err_msg or "504" in err_msg:
+                            time.sleep(3)
+                            continue
                         break
-                except Exception as e:
-                    err_msg = str(e)
-                    logging.warning(f"Ошибка при вызове {model_name}: {err_msg[:120]}")
-                    if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-                        raise e  # перехватим во внешнем блоке для ротации ключа
-                    time.sleep(1)
+                if text:
+                    break
 
             if text:
                 break

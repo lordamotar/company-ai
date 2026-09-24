@@ -81,12 +81,15 @@ def update_call_details(data: CallUpdateRequest) -> CallUpdateResponse:
                         tire_count = COALESCE(%s, tire_count),
                         branch_address = COALESCE(%s, branch_address),
                         payment_method = COALESCE(%s, payment_method),
-                        lost_reason = COALESCE(%s, lost_reason)
+                        lost_reason = COALESCE(%s, lost_reason),
+                        call_category = COALESCE(%s, call_category),
+                        call_subcategory = COALESCE(%s, call_subcategory)
                     WHERE id = %s;
                 """, (
                     new_manager, new_city, sale_status, order_sum, has_upsell, upsell_sum, upsell_text, service_booking, service_date,
                     data.client_name, data.car_model, data.tire_brand, data.tire_size, data.tire_season, data.tire_count,
                     data.branch_address, data.payment_method, data.lost_reason,
+                    data.call_category, data.call_subcategory,
                     call_id
                 ))
 

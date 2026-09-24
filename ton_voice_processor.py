@@ -476,25 +476,28 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
             client = genai.Client(api_key=curr_key)
             is_quota_error = False
             
-            for model_name in ["gemini-3.6-flash", "gemini-2.5-pro", "gemini-2.5-flash-preview"]:
-                try:
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=prompt
-                    )
-                    if response and response.text:
-                        content = response.text.strip()
+            for model_name in ["gemini-3.6-flash", "gemini-3.6-pro", "gemini-2.5-pro", "gemini-2.5-flash"]:
+                for retry in range(5):
+                    try:
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=prompt
+                        )
+                        if response and response.text:
+                            content = response.text.strip()
+                            break
+                    except Exception as e:
+                        err_msg = str(e)
+                        logging.warning(f"[Тон 5] Ошибка при вызове {model_name} (попытка {retry + 1}/5): {err_msg[:120]}")
+                        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                            is_quota_error = True
+                            break
+                        if "503" in err_msg or "UNAVAILABLE" in err_msg or "500" in err_msg or "504" in err_msg:
+                            time.sleep(3)
+                            continue
                         break
-                except Exception as e:
-                    err_msg = str(e)
-                    logging.warning(f"[Тон 5] Ошибка при вызове {model_name}: {err_msg[:120]}")
-                    if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-                        is_quota_error = True
-                        break
-                    time.sleep(1)
-
-            if content:
-                break
+                if content or is_quota_error:
+                    break
                 
             if is_quota_error and len(keys) > 1 and attempt < max_attempts - 1:
                 logging.info("[Тон 5] Смена ключа Gemini из-за исчерпания квоты (429)...")

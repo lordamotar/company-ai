@@ -64,16 +64,61 @@ def detect_city(text):
     return "Алматы"
 
 def detect_tire_details(text):
-    brands = ["Cordiant", "Winter Drive", "Nokian", "Nordman", "Kormoran", "Michelin", "Pirelli", "Bridgestone", "Continental", "Viatti", "Triangle", "Sailun", "Кама"]
-    found_brands = [b for b in brands if b.lower() in text.lower()]
-    brand_str = " / ".join(found_brands) if found_brands else "Шины R15-R16"
+    text_str = text or ""
+    brands = [
+        "Cordiant", "Winter Drive", "Nokian", "Nordman", "Kormoran", "Michelin", 
+        "Pirelli", "Bridgestone", "Continental", "Viatti", "Triangle", "Sailun", 
+        "Кама", "Dunlop", "Yokohama", "Goodyear", "Hankook", "Kumho", "BFGoodrich", "Skad"
+    ]
+    found_brands = [b for b in brands if b.lower() in text_str.lower()]
+    brand_str = " / ".join(found_brands) if found_brands else None
 
-    m_size = re.search(r'(\d{3}[\s/]\d{2}[\s/R]*\d{2})', text, re.I)
-    tire_size = m_size.group(1).replace(" ", "/").upper() if m_size else "205/65 R15"
+    m_size = re.search(r'(\d{3}[\s/]\d{2}[\s/R]*\d{2})', text_str, re.I)
+    tire_size = m_size.group(1).replace(" ", "/").upper() if m_size else None
 
     return brand_str, tire_size
 
+def detect_call_classification(text, sale_status="Консультация", service_booking="Нет", conflict=False, has_upsell=False):
+    """Определяет категорию, подкатегорию и теги для звонка на основе текста и метаданных."""
+    text_lower = (text or "").lower()
+    tags = []
+
+    # Теги
+    if any(k in text_lower for k in ["kaspi", "каспи", "рассрочк", "кредит", "qr"]):
+        tags.append("Kaspi / Рассрочка")
+    if any(k in text_lower for k in ["доставк", "отправк"]):
+        tags.append("Доставка")
+    if has_upsell or any(k in text_lower for k in ["хранени", "доп продаж"]):
+        tags.append("Доп. продажа")
+    if conflict or "жалоб" in text_lower or "претензи" in text_lower:
+        tags.append("Конфликт / Претензия")
+    if "наличи" in text_lower or "есть в" in text_lower:
+        tags.append("Проверка наличия")
+
+    # Категории
+    if service_booking == "Да" or ("монтаж" in text_lower and ("запис" in text_lower or "приехать" in text_lower or "поменять" in text_lower)):
+        category = "Запись на шиномонтаж"
+        subcategory = "Сервисное обслуживание"
+    elif "забронир" in text_lower or "резерв" in text_lower or sale_status in ["Продажа", "Заказ", "Забронировано"] or ("комплект" in text_lower and "наличи" in text_lower):
+        category = "Подбор и бронь шин"
+        subcategory = "Заказ и бронирование"
+    elif any(k in text_lower for k in ["адрес", "где вы", "как проехать", "улиц", "до скольки", "работает", "график"]):
+        category = "Инфо: Адрес / Время"
+        subcategory = "Справочная информация"
+    elif any(k in text_lower for k in ["интернет-заказ", "номер заказа", "пришли шины", "готовы шины"]):
+        category = "Статус заказа"
+        subcategory = "Проверка готовности"
+    elif any(k in text_lower for k in ["гарантия", "брак", "порез", "возврат", "претензия"]):
+        category = "Рекламация / Претензия"
+        subcategory = "Гарантия и Возврат"
+    else:
+        category = "Прочее / Консультация"
+        subcategory = "Общие вопросы"
+
+    return category, subcategory, tags
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 DEFAULT_OUTPUT_JSON = os.path.join(BASE_DIR, "frontend", "calls_data.json")
 DEFAULT_AUDIT_JSON = os.path.join(BASE_DIR, "frontend", "audit_data.json")
 
@@ -138,7 +183,8 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 ae.dominant_emotion, ae.confidence as emotion_conf, ae.happy_score, ae.neutral_score, ae.sad_score, ae.angry_score,
                 cs.customer_sentiment_start, cs.customer_sentiment_end, cs.satisfaction_score, cs.manager_politeness, cs.conflict_detected, cs.conflict_reason, cs.tone_summary,
                 t.sale_status, t.order_sum, t.has_upsell, t.upsell_sum, t.upsell_text, t.service_booking, t.service_date,
-                t.client_name, t.car_model, t.tire_brand, t.tire_size, t.tire_season, t.tire_count, t.branch_address, t.payment_method, t.lost_reason, t.call_summary
+                t.client_name, t.car_model, t.tire_brand, t.tire_size, t.tire_season, t.tire_count, t.branch_address, t.payment_method, t.lost_reason, t.call_summary,
+                t.call_category, t.call_subcategory, t.call_tags
             FROM call_transcriptions t
             LEFT JOIN call_audio_features af ON t.id = af.call_id
             LEFT JOIN call_audio_emotions ae ON t.id = ae.call_id
@@ -259,6 +305,20 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             db_payment_method = r[45] if len(r) > 45 and r[45] else None
             db_lost_reason = r[46] if len(r) > 46 and r[46] else None
             db_call_summary = r[47] if len(r) > 47 and r[47] else None
+            db_category = r[48] if len(r) > 48 and r[48] else None
+            db_subcategory = r[49] if len(r) > 49 and r[49] else None
+            db_tags = r[50] if len(r) > 50 and r[50] else None
+
+            # Если классификация еще не установлена в БД, высчитываем ее
+            if not db_category or db_category == 'Прочее / Консультация':
+                det_cat, det_subcat, det_tags = detect_call_classification(raw_text, sale_status, service_booking, conflict, has_upsell)
+                call_category = db_category or det_cat
+                call_subcategory = db_subcategory or det_subcat
+                call_tags = db_tags if db_tags else det_tags
+            else:
+                call_category = db_category
+                call_subcategory = db_subcategory or "Общие вопросы"
+                call_tags = db_tags if isinstance(db_tags, list) else []
 
             manager_name = db_manager if db_manager else detect_manager_name(raw_text)
             city_name = db_city if db_city else detect_city(raw_text)
@@ -365,6 +425,9 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 "callSummary": db_call_summary or summary,
                 "topic": topic_str,
                 "city": city_name,
+                "callCategory": call_category,
+                "callSubcategory": call_subcategory,
+                "callTags": call_tags,
                 "productCat": db_tire_season or "Зимние шины",
                 "orderSum": order_sum,
                 "outcome": sale_status,
@@ -424,6 +487,21 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 "checklist": checklist
             })
 
+            # Синхронизируем разметку обратно в PostgreSQL для сохранности
+            try:
+                cursor.execute("""
+                    UPDATE call_transcriptions
+                    SET call_category = COALESCE(call_category, %s),
+                        call_subcategory = COALESCE(call_subcategory, %s),
+                        call_tags = COALESCE(call_tags, %s),
+                        tire_brand = COALESCE(NULLIF(tire_brand, ''), %s),
+                        tire_size = COALESCE(NULLIF(tire_size, ''), %s)
+                    WHERE id = %s;
+                """, (call_category, call_subcategory, json.dumps(call_tags, ensure_ascii=False), det_brand, det_size, call_id))
+            except Exception:
+                pass
+
+        conn.commit()
         cursor.close()
         conn.close()
 

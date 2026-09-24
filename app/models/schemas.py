@@ -23,6 +23,8 @@ class CallUpdateRequest(BaseModel):
     branch_address: Optional[str] = Field(default=None, description="Филиал/склад", examples=["Карагайлы"])
     payment_method: Optional[str] = Field(default=None, description="Способ оплаты", examples=["Kaspi QR"])
     lost_reason: Optional[str] = Field(default=None, description="Причина отказа", examples=["Нет нужного размера"])
+    call_category: Optional[str] = Field(default=None, description="Категория звонка", examples=["Запись на шиномонтаж"])
+    call_subcategory: Optional[str] = Field(default=None, description="Подкатегория звонка", examples=["Сервисное обслуживание"])
 
 class CallUpdateResponse(BaseModel):
     success: bool

@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS call_transcriptions (
     payment_method VARCHAR(128),
     lost_reason TEXT,
     call_summary TEXT,
+    call_category VARCHAR(64) DEFAULT 'Прочее / Консультация',
+    call_subcategory VARCHAR(64) DEFAULT 'Общие вопросы',
+    call_tags JSONB DEFAULT '[]',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -120,3 +123,8 @@ CREATE TABLE IF NOT EXISTS customer_sentiment (
 CREATE INDEX IF NOT EXISTS idx_audio_segments_call_id ON call_audio_segments(call_id);
 CREATE INDEX IF NOT EXISTS idx_sentiment_lines_call_id ON call_text_sentiment_lines(call_id);
 CREATE INDEX IF NOT EXISTS idx_customer_sentiment_call_id ON customer_sentiment(call_id);
+
+-- Обновление существующей таблицы call_transcriptions новыми полями классификации
+ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS call_category VARCHAR(64) DEFAULT 'Прочее / Консультация';
+ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS call_subcategory VARCHAR(64) DEFAULT 'Общие вопросы';
+ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS call_tags JSONB DEFAULT '[]';

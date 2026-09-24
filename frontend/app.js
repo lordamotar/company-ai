@@ -253,6 +253,29 @@ function renderCallsTable(data, keepPage = false) {
                 serviceBadge = `<span class="badge badge-success" style="font-size: 10px; padding: 2.5px 7px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); font-weight: 600;" title="Запись на сервис: ${call.serviceBooking}${call.serviceDate ? ' на ' + call.serviceDate : ''}">🟢 Сервис: ${call.serviceBooking}</span>`;
             }
 
+            let categoryBadge = "";
+            const cat = call.callCategory || "Прочее / Консультация";
+            if (cat === "Запись на шиномонтаж") {
+                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); font-weight: 600;">🛠️ ${cat}</span>`;
+            } else if (cat === "Подбор и бронь шин") {
+                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); font-weight: 600;">🛒 ${cat}</span>`;
+            } else if (cat === "Инфо: Адрес / Время") {
+                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.4); font-weight: 500;">📍 ${cat}</span>`;
+            } else if (cat === "Статус заказа") {
+                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4); font-weight: 600;">📦 ${cat}</span>`;
+            } else if (cat === "Рекламация / Претензия") {
+                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-weight: 600;">⚠️ ${cat}</span>`;
+            } else {
+                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); font-weight: 500;">💬 ${cat}</span>`;
+            }
+
+            let tagsBadges = "";
+            if (Array.isArray(call.callTags) && call.callTags.length > 0) {
+                tagsBadges = `<div style="display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px;">` + 
+                    call.callTags.map(t => `<span style="font-size: 9.5px; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,0.06); color: var(--text-secondary); border: 1px solid var(--border-color);">${t}</span>`).join("") + 
+                    `</div>`;
+            }
+
             tr.innerHTML = `
                 <td>
                     <div class="call-id-col">
@@ -265,7 +288,12 @@ function renderCallsTable(data, keepPage = false) {
                     <div class="manager-badge" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" onclick="event.stopPropagation(); openEditCallModal(${call.id});" title="Нажмите, чтобы изменить данные звонка">
                         <span class="manager-avatar-sm">${managerInitial}</span>
                         <span>${managerName}</span>
-                        <span style="font-size: 11px; opacity: 0.7;" title="Редактировать">✏️</span>
+                    </div>
+                </td>
+                <td>
+                    <div style="display: flex; flex-direction: column; gap: 2px; align-items: flex-start;">
+                        ${categoryBadge}
+                        ${tagsBadges}
                     </div>
                 </td>
                 <td>
@@ -288,8 +316,7 @@ function renderCallsTable(data, keepPage = false) {
                     </div>
                 </td>
                 <td>${emotionBadge}</td>
-                <td><span class="stars-score">⭐ ${call.csat || 5}.0 / 5</span></td>
-                <td><span class="badge ${call.statusClass || 'badge-success'}">${call.status || 'Обработан'}</span></td>
+                <td><span class="stars-score">⭐ ${Number(call.csat || 5).toFixed(1)}</span></td>
                 <td class="text-right" style="white-space: nowrap;">
                     <button class="btn-icon" style="margin-right: 4px; padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;" onclick="event.stopPropagation(); openEditCallModal(${call.id});" title="Редактировать имя менеджера или город">
                         ✏️
@@ -1527,6 +1554,9 @@ function openCallModal(callId) {
     // Вкладка 1: Резюме
     document.getElementById("modalSummaryText").innerText = call.callSummary || call.summary || "Транскрипция и краткое резюме звонка.";
     
+    const catEl = document.getElementById("modalCallCategory");
+    if (catEl) catEl.innerText = `${call.callCategory || 'Прочее / Консультация'}${call.callSubcategory ? ' (' + call.callSubcategory + ')' : ''}`;
+
     const clientNameEl = document.getElementById("modalClientName");
     if (clientNameEl) clientNameEl.innerText = call.clientName || `Клиент (${call.phone || ''})`;
 
@@ -1539,11 +1569,14 @@ function openCallModal(callId) {
     const productCatEl = document.getElementById("modalProductCat");
     if (productCatEl) productCatEl.innerText = call.tireSeason || call.productCat || "Зимние шины";
 
+    const tireBrandEl = document.getElementById("modalTireBrand");
+    if (tireBrandEl) {
+        tireBrandEl.innerText = call.tireBrand || call.brand || "— (Не назван)";
+    }
+
     const tireSizeEl = document.getElementById("modalTireSize");
     if (tireSizeEl) {
-        const brand = call.tireBrand || call.brand || "";
-        const size = call.tireSize || "";
-        tireSizeEl.innerText = (brand || size) ? `${brand} ${size}`.trim() : "—";
+        tireSizeEl.innerText = call.tireSize || "— (Не указан)";
     }
 
     const tireCountEl = document.getElementById("modalTireCount");
@@ -2798,6 +2831,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Единая функция фильтрации звонков
     function applyCallsFilters() {
         const searchInput = document.getElementById("searchInput");
+        const categoryFilter = document.getElementById("categoryFilter");
         const outcomeFilter = document.getElementById("outcomeFilter");
         const emotionFilter = document.getElementById("emotionFilter");
         const scoreFilter = document.getElementById("scoreFilter");
@@ -2805,6 +2839,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const activeText = document.getElementById("activeFilterText");
 
         const searchVal = (searchInput?.value || "").toLowerCase().trim();
+        const categoryVal = categoryFilter?.value || "all";
         const outcomeVal = outcomeFilter?.value || "all";
         const emotionVal = emotionFilter?.value || "all";
         const scoreVal = scoreFilter?.value || "all";
@@ -2819,9 +2854,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 (c.city && c.city.toLowerCase().includes(searchVal)) ||
                 (c.manager && c.manager.toLowerCase().includes(searchVal)) ||
                 (c.summary && c.summary.toLowerCase().includes(searchVal)) ||
+                (c.callCategory && c.callCategory.toLowerCase().includes(searchVal)) ||
                 (c.saleStatus && c.saleStatus.toLowerCase().includes(searchVal)) ||
                 (c.serviceBooking && c.serviceBooking.toLowerCase().includes(searchVal))
             );
+        }
+
+        // 1.5. Фильтр по категории
+        if (categoryVal !== "all") {
+            filtered = filtered.filter(c => (c.callCategory || "Прочее / Консультация") === categoryVal);
         }
 
         // 2. Фильтр по коммерческому результату (продажи / услуги)
@@ -2916,6 +2957,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const searchInput = document.getElementById("searchInput");
     if (searchInput) {
         searchInput.oninput = applyCallsFilters;
+    }
+
+    // Фильтр по категориям звонков
+    const categoryFilter = document.getElementById("categoryFilter");
+    if (categoryFilter) {
+        categoryFilter.onchange = applyCallsFilters;
     }
 
     // Фильтр по коммерческому результату (сделки / услуги)
