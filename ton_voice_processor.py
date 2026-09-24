@@ -350,14 +350,14 @@ def extract_entities_fallback(text):
             break
 
     # 4. Сезонность
-    if "шип" in text_lower or "шипован" in text_lower:
-        res["tire_season"] = "Зимние шипованные"
-    elif "липуч" in text_lower or "фрикцион" in text_lower:
+    if "нешип" in text_lower or "не шип" in text_lower or "липуч" in text_lower or "фрикцион" in text_lower:
         res["tire_season"] = "Зимние фрикционные (липучка)"
-    elif "летн" in text_lower or "лето" in text_lower:
-        res["tire_season"] = "Летние"
+    elif "шип" in text_lower or "шипован" in text_lower:
+        res["tire_season"] = "Зимние шипованные"
     elif "всесезон" in text_lower:
         res["tire_season"] = "Всесезонные"
+    elif "летн" in text_lower or "лето" in text_lower:
+        res["tire_season"] = "Летние"
     elif "зимн" in text_lower or "зима" in text_lower:
         res["tire_season"] = "Зимние"
 
@@ -459,13 +459,13 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
     10. Если клиент вежливо завершил разговор и поблагодарил, satisfaction_score должен быть не ниже 4.
 
     Диалог:
-    {transcript_text[:4000]}
+    {transcript_text[:25000]}
     """
     
     content = None
     
     # 1. Пробуем через актуальный Gemini API (Google) с поддержкой пула ключей
-    from worker import get_gemini_api_keys, get_current_gemini_key, rotate_gemini_key
+    from worker import get_gemini_api_keys, get_current_gemini_key, rotate_gemini_key, get_configured_models
     keys = get_gemini_api_keys()
     
     if keys:
@@ -476,8 +476,8 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
             client = genai.Client(api_key=curr_key)
             is_quota_error = False
             
-            for model_name in ["gemini-3.6-flash", "gemini-3.6-pro", "gemini-2.5-pro", "gemini-2.5-flash"]:
-                for retry in range(5):
+            for model_name in get_configured_models():
+                for retry in range(4):
                     try:
                         response = client.models.generate_content(
                             model=model_name,
@@ -563,13 +563,13 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
         """
         cursor.execute(query_sentiment, (
             call_id,
-            data.get("customer_sentiment_start", "нейтральный"),
-            data.get("customer_sentiment_end", "позитивный"),
-            int(data.get("satisfaction_score", 5)),
-            int(data.get("manager_politeness", 5)),
+            data.get("customer_sentiment_start") or ("нейтральный" if content else "не проанализировано"),
+            data.get("customer_sentiment_end") or ("нейтральный" if content else "не проанализировано"),
+            int(data["satisfaction_score"]) if data.get("satisfaction_score") is not None else None,
+            int(data["manager_politeness"]) if data.get("manager_politeness") is not None else None,
             bool(data.get("conflict_detected", False)),
             data.get("conflict_reason") if data.get("conflict_detected") else None,
-            data.get("tone_summary", data.get("call_summary", "Разговор прошел успешно."))
+            data.get("tone_summary", data.get("call_summary", "Тон не проанализирован (сбой LLM)" if not content else "Разговор завершен."))
         ))
 
         # 2. Автоматическая фиксация сделки, допродажи, сервиса и всех параметров в call_transcriptions
@@ -699,3 +699,257 @@ def process_all_tone_voice(call_id, file_path, transcript_text):
     finally:
         cursor.close()
         conn.close()
+
+
+def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_name=None):
+    """
+    Сохраняет результаты единого анализа Gemini (audio-to-JSON) во все таблицы Tone of Voice:
+    1. call_audio_features: RMS, активная речь, тишина, темп речи WPM.
+    2. call_audio_emotions: честное распределение эмоций реплик из Gemini (без wav2vec2).
+    3. call_audio_segments: посегментный таймлайн фраз диалога с временными метками.
+    4. call_text_sentiment_lines: реплики диалога со статусом тональности (ПОЗИТИВ/НЕЙТРАЛЬНЫЙ/НЕГАТИВ).
+    5. customer_sentiment: CSAT, вежливость, конфликт, резюме настроения.
+    6. call_transcriptions: текст, коммерческие поля, категория, теги и честный чек-лист с цитатами.
+    """
+    logging.info(f"=== Сохранение единого анализа звонка для call_id={call_id} ===")
+    conn = psycopg2.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    try:
+        dialogue = analysis_data.get("dialogue", [])
+        acoustics = analysis_data.get("acoustics", {})
+        comm = analysis_data.get("commercial", {})
+        ov = analysis_data.get("overall_sentiment", {})
+        chk = analysis_data.get("checklist", [])
+
+        # 1. Акустика: быстрое вычисление RMS и длительности
+        mean_rms = 0.04
+        max_rms = 0.20
+        loud_pct = 0.0
+        duration = 60.0
+        if file_path and os.path.exists(file_path):
+            try:
+                import librosa
+                y, sr = librosa.load(file_path, sr=None)
+                duration = float(librosa.get_duration(y=y, sr=sr))
+                rms = librosa.feature.rms(y=y)[0]
+                mean_rms = float(np.mean(rms))
+                max_rms = float(np.max(rms))
+                loud_frames = np.sum(rms > mean_rms * 2.5)
+                loud_pct = float((loud_frames / len(rms)) * 100) if len(rms) > 0 else 0.0
+            except Exception as e:
+                logging.warning(f"Ошибка вычисления RMS librosa: {e}")
+                if dialogue and dialogue[-1].get("end_sec"):
+                    duration = float(dialogue[-1]["end_sec"])
+
+        mgr_sec = float(acoustics.get("manager_speech_sec", 0.0))
+        client_sec = float(acoustics.get("client_speech_sec", 0.0))
+        active_sec = mgr_sec + client_sec
+        if active_sec <= 0:
+            active_sec = duration * 0.8
+        silence_sec = float(acoustics.get("silence_sec", max(0.0, duration - active_sec)))
+        silence_pct = float((silence_sec / duration) * 100) if duration > 0 else 20.0
+        tempo_wpm = float(acoustics.get("speech_tempo_wpm", 125.0))
+
+        cursor.execute("""
+            INSERT INTO call_audio_features (
+                call_id, mean_rms, max_rms, loud_moments_pct, silent_duration_sec,
+                silence_pct, speech_tempo, active_speech_sec
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (call_id) DO UPDATE SET
+                mean_rms = EXCLUDED.mean_rms,
+                max_rms = EXCLUDED.max_rms,
+                loud_moments_pct = EXCLUDED.loud_moments_pct,
+                silent_duration_sec = EXCLUDED.silent_duration_sec,
+                silence_pct = EXCLUDED.silence_pct,
+                speech_tempo = EXCLUDED.speech_tempo,
+                active_speech_sec = EXCLUDED.active_speech_sec;
+        """, (call_id, mean_rms, max_rms, loud_pct, silence_sec, silence_pct, tempo_wpm, active_sec))
+
+        # 2 & 3. Сегменты диалога и честное распределение эмоций реплик (без wav2vec2 и rubert)
+        cursor.execute("DELETE FROM call_text_sentiment_lines WHERE call_id = %s;", (call_id,))
+        cursor.execute("DELETE FROM call_audio_segments WHERE call_id = %s;", (call_id,))
+
+        happy_cnt = 0
+        neutral_cnt = 0
+        sad_cnt = 0
+        angry_cnt = 0
+
+        for idx, item in enumerate(dialogue, start=1):
+            spk = item.get("speaker", "Менеджер")
+            phrase_text = item.get("text", "")
+            sent = str(item.get("sentiment", "neutral")).lower()
+            em = str(item.get("emotion", "Нейтральный"))
+
+            sent_label = "ПОЗИТИВ" if sent == "positive" else ("НЕГАТИВ" if sent == "negative" else "НЕЙТРАЛЬНЫЙ")
+            cursor.execute("""
+                INSERT INTO call_text_sentiment_lines (call_id, line_number, speaker, phrase_text, sentiment_label, confidence)
+                VALUES (%s, %s, %s, %s, %s, %s);
+            """, (call_id, idx, spk, phrase_text, sent_label, 0.95))
+
+            start_s = float(item.get("start_sec", 0.0))
+            end_s = float(item.get("end_sec", start_s + 2.5))
+            cursor.execute("""
+                INSERT INTO call_audio_segments (call_id, start_sec, end_sec, dominant_emotion, confidence)
+                VALUES (%s, %s, %s, %s, %s);
+            """, (call_id, start_s, end_s, em, 90.0))
+
+            if "радост" in em.lower() or sent == "positive":
+                happy_cnt += 1
+            elif "груст" in em.lower():
+                sad_cnt += 1
+            elif "гнев" in em.lower() or "раздраж" in em.lower() or sent == "negative":
+                angry_cnt += 1
+            else:
+                neutral_cnt += 1
+
+        total_cnt = len(dialogue) or 1
+        happy_score = round((happy_cnt / total_cnt) * 100, 1)
+        neutral_score = round((neutral_cnt / total_cnt) * 100, 1)
+        sad_score = round((sad_cnt / total_cnt) * 100, 1)
+        angry_score = round((angry_cnt / total_cnt) * 100, 1)
+
+        em_map = {"Радость": happy_score, "Нейтральный": neutral_score, "Грусть": sad_score, "Гнев": angry_score}
+        dom_emotion = max(em_map, key=em_map.get)
+        dom_conf = em_map[dom_emotion]
+
+        cursor.execute("""
+            INSERT INTO call_audio_emotions (
+                call_id, dominant_emotion, confidence, happy_score, neutral_score, sad_score, angry_score
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (call_id) DO UPDATE SET
+                dominant_emotion = EXCLUDED.dominant_emotion,
+                confidence = EXCLUDED.confidence,
+                happy_score = EXCLUDED.happy_score,
+                neutral_score = EXCLUDED.neutral_score,
+                sad_score = EXCLUDED.sad_score,
+                angry_score = EXCLUDED.angry_score;
+        """, (call_id, dom_emotion, dom_conf, happy_score, neutral_score, sad_score, angry_score))
+
+        # 4. Общая удовлетворенность (customer_sentiment)
+        csat = ov.get("satisfaction_score")
+        politeness = ov.get("manager_politeness")
+        conflict = bool(ov.get("conflict_detected", False))
+        conflict_reason = ov.get("conflict_reason") if conflict else None
+        summary = ov.get("tone_summary", "")
+
+        cursor.execute("""
+            INSERT INTO customer_sentiment (
+                call_id, customer_sentiment_start, customer_sentiment_end,
+                satisfaction_score, manager_politeness, conflict_detected,
+                conflict_reason, tone_summary
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (call_id) DO UPDATE SET
+                customer_sentiment_start = EXCLUDED.customer_sentiment_start,
+                customer_sentiment_end = EXCLUDED.customer_sentiment_end,
+                satisfaction_score = EXCLUDED.satisfaction_score,
+                manager_politeness = EXCLUDED.manager_politeness,
+                conflict_detected = EXCLUDED.conflict_detected,
+                conflict_reason = EXCLUDED.conflict_reason,
+                tone_summary = EXCLUDED.tone_summary;
+        """, (
+            call_id,
+            ov.get("customer_sentiment_start", "нейтральный"),
+            ov.get("customer_sentiment_end", "удовлетворенный"),
+            int(csat) if csat is not None else None,
+            int(politeness) if politeness is not None else None,
+            conflict,
+            conflict_reason,
+            summary
+        ))
+
+        # 5. Обновление коммерческих данных, чек-листа и классификации в call_transcriptions
+        sale_status = comm.get("sale_status", "Консультация")
+        order_sum = str(comm.get("order_sum", "0 ₸"))
+        has_upsell = bool(comm.get("has_upsell", False))
+        upsell_sum = str(comm.get("upsell_sum", "0 ₸"))
+        upsell_text = str(comm.get("upsell_text", ""))
+        service_booking = str(comm.get("service_booking", "Нет"))
+        service_date = str(comm.get("service_date", ""))
+        client_name = comm.get("client_name")
+        car_model = comm.get("car_model")
+        tire_brand = comm.get("tire_brand")
+        tire_size = comm.get("tire_size")
+        tire_season = comm.get("tire_season")
+        tire_count = comm.get("tire_count")
+        branch_address = comm.get("branch_address")
+        payment_method = comm.get("payment_method")
+        lost_reason = comm.get("lost_reason")
+        call_summary = comm.get("call_summary") or summary
+        call_category = comm.get("call_category", "Подбор и бронь шин")
+        call_subcategory = comm.get("call_subcategory", "Заказ и бронирование")
+        call_tags = comm.get("call_tags", [])
+        city_name = comm.get("city_name")
+
+        cursor.execute("""
+            UPDATE call_transcriptions
+            SET text = %s,
+                manager_name = COALESCE(%s, manager_name),
+                city_name = COALESCE(%s, city_name),
+                duration_sec = %s,
+                status = 'completed',
+                last_error = NULL,
+                sale_status = %s,
+                order_sum = %s,
+                has_upsell = %s,
+                upsell_sum = %s,
+                upsell_text = %s,
+                service_booking = %s,
+                service_date = %s,
+                client_name = %s,
+                car_model = %s,
+                tire_brand = %s,
+                tire_size = %s,
+                tire_season = %s,
+                tire_count = %s,
+                branch_address = %s,
+                payment_method = %s,
+                lost_reason = %s,
+                call_summary = %s,
+                call_category = %s,
+                call_subcategory = %s,
+                call_tags = %s,
+                checklist = %s
+            WHERE id = %s;
+        """, (
+            full_text,
+            manager_name,
+            city_name,
+            duration,
+            sale_status,
+            order_sum,
+            has_upsell,
+            upsell_sum,
+            upsell_text,
+            service_booking,
+            service_date,
+            client_name,
+            car_model,
+            tire_brand,
+            tire_size,
+            tire_season,
+            tire_count,
+            branch_address,
+            payment_method,
+            lost_reason,
+            call_summary,
+            call_category,
+            call_subcategory,
+            json.dumps(call_tags, ensure_ascii=False),
+            json.dumps(chk, ensure_ascii=False),
+            call_id
+        ))
+
+        conn.commit()
+        logging.info(f"[+] Единый анализ успешно сохранен для call_id={call_id}: статус='{sale_status}', сумма={order_sum}, чек-лист={len(chk)} пунктов.")
+    except Exception as e:
+        conn.rollback()
+        logging.error(f"[-] Ошибка при сохранении единого анализа: {e}", exc_info=True)
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+

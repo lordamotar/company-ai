@@ -143,10 +143,11 @@ function updateKpis(data) {
         return;
     }
 
-    // Средняя оценка CSAT
-    const totalCsat = data.reduce((acc, c) => acc + (Number(c.csat) || 0), 0);
-    const avgCsat = (totalCsat / total).toFixed(1);
-    if (avgScoreEl) avgScoreEl.innerHTML = `${avgCsat} <span class="max-val">/ 5.0</span>`;
+    // Средняя оценка CSAT (только по звонкам с оценкой)
+    const scoredCalls = data.filter(c => c.csat !== null && c.csat !== undefined && c.csat !== "");
+    const totalCsat = scoredCalls.reduce((acc, c) => acc + (Number(c.csat) || 0), 0);
+    const avgCsat = scoredCalls.length > 0 ? (totalCsat / scoredCalls.length).toFixed(1) : "—";
+    if (avgScoreEl) avgScoreEl.innerHTML = avgCsat !== "—" ? `${avgCsat} <span class="max-val">/ 5.0</span>` : "—";
 
     // Среднее соблюдение скрипта
     const totalScript = data.reduce((acc, c) => acc + (Number(c.scriptScore) || 0), 0);
@@ -316,7 +317,7 @@ function renderCallsTable(data, keepPage = false) {
                     </div>
                 </td>
                 <td>${emotionBadge}</td>
-                <td><span class="stars-score">⭐ ${Number(call.csat || 5).toFixed(1)}</span></td>
+                <td>${(call.csat !== null && call.csat !== undefined && call.csat !== "") ? `<span class="stars-score">⭐ ${Number(call.csat).toFixed(1)}</span>` : `<span class="text-muted" style="font-size: 11.5px;">Не оценен</span>`}</td>
                 <td class="text-right" style="white-space: nowrap;">
                     <button class="btn-icon" style="margin-right: 4px; padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;" onclick="event.stopPropagation(); openEditCallModal(${call.id});" title="Редактировать имя менеджера или город">
                         ✏️
@@ -546,7 +547,10 @@ function renderManagers(data, keepPage = false) {
         managersMap[name].calls.push(call);
         if (call.direction === "out") managersMap[name].outCalls++;
         else managersMap[name].inCalls++;
-        managersMap[name].totalCsat += Number(call.csat) || 0;
+        if (call.csat !== null && call.csat !== undefined && call.csat !== "") {
+            managersMap[name].totalCsat += Number(call.csat);
+            managersMap[name].csatCount = (managersMap[name].csatCount || 0) + 1;
+        }
         managersMap[name].totalScript += Number(call.scriptScore) || 0;
         if (call.emotionClass === "happy" || call.emotion === "Радость") {
             managersMap[name].happyCount++;
@@ -571,7 +575,7 @@ function renderManagers(data, keepPage = false) {
 
     pagedManagers.forEach(m => {
         const count = m.calls.length;
-        const avgCsat = (m.totalCsat / count).toFixed(1);
+        const avgCsat = (m.csatCount && m.csatCount > 0) ? (m.totalCsat / m.csatCount).toFixed(1) : "—";
         const avgScript = Math.round(m.totalScript / count);
         const happyPct = Math.round((m.happyCount / count) * 100);
         const initial = m.name[0] || "М";
@@ -586,7 +590,7 @@ function renderManagers(data, keepPage = false) {
                     <div class="manager-name-lg">${m.name}</div>
                     <div class="manager-role-tag">Менеджер отдела продаж</div>
                 </div>
-                <span class="badge badge-success">⭐ ${avgCsat} / 5.0</span>
+                <span class="badge ${avgCsat !== '—' ? 'badge-success' : 'badge-neutral'}">⭐ ${avgCsat} / 5.0</span>
             </div>
 
             <div class="manager-stats-grid" onclick="openManagerAnalytics('${m.name}')">
@@ -666,16 +670,17 @@ function openManagerAnalytics(managerName) {
     const avgDurStr = `${Math.floor(avgSec / 60)}:${(avgSec % 60 < 10 ? "0" : "")}${avgSec % 60}`;
 
     // Средний CSAT и Скрипт
-    const avgCsat = (mgrCalls.reduce((sum, c) => sum + (Number(c.csat) || 0), 0) / count).toFixed(1);
+    const scoredMgrCalls = mgrCalls.filter(c => c.csat !== null && c.csat !== undefined && c.csat !== "");
+    const avgCsat = scoredMgrCalls.length > 0 ? (scoredMgrCalls.reduce((sum, c) => sum + Number(c.csat), 0) / scoredMgrCalls.length).toFixed(1) : "—";
     const avgScript = Math.round(mgrCalls.reduce((sum, c) => sum + (Number(c.scriptScore) || 0), 0) / count);
 
     // Вежливость
+    const scoredPoliteCalls = mgrCalls.filter(c => c.managerPoliteness && !c.managerPoliteness.includes("Не"));
     let politenessSum = 0;
-    mgrCalls.forEach(c => {
-        const p = parseFloat(c.managerPoliteness) || 5;
-        politenessSum += p;
+    scoredPoliteCalls.forEach(c => {
+        politenessSum += parseFloat(c.managerPoliteness) || 0;
     });
-    const avgPoliteness = (politenessSum / count).toFixed(1);
+    const avgPoliteness = scoredPoliteCalls.length > 0 ? (politenessSum / scoredPoliteCalls.length).toFixed(1) : "—";
 
     // Упущенные допродажи
     let lostUpsellCalls = 0;
@@ -1049,8 +1054,8 @@ function groupCallsByClient(data) {
         const totalCalls = c.calls.length;
         const avgCsat = c.csatScores.length > 0 
             ? (c.csatScores.reduce((a, b) => a + b, 0) / c.csatScores.length).toFixed(1)
-            : "5.0";
-        const happyPct = totalCalls > 0 ? Math.round((c.happyCount / totalCalls) * 100) : 100;
+            : "—";
+        const happyPct = totalCalls > 0 ? Math.round((c.happyCount / totalCalls) * 100) : 0;
         
         // Сортировка звонков: сначала самые свежие
         c.calls.sort((a, b) => {
@@ -1127,13 +1132,17 @@ function renderClients(data, keepPage = false) {
 
     const repeatClients = clients.filter(c => c.totalCalls > 1).length;
     const repeatPct = Math.round((repeatClients / totalClients) * 100);
-    const allTotalSum = clients.reduce((acc, c) => acc + c.totalSpent, 0);
-    const avgCsatAll = (clients.reduce((acc, c) => acc + parseFloat(c.avgCsat), 0) / totalClients).toFixed(1);
+    const validClientCsats = clients.filter(c => c.avgCsat && c.avgCsat !== "—").map(c => parseFloat(c.avgCsat));
+    const avgCsatAll = validClientCsats.length > 0 
+        ? (validClientCsats.reduce((acc, v) => acc + v, 0) / validClientCsats.length).toFixed(1)
+        : "—";
+
+    const allTotalSum = clients.reduce((acc, c) => acc + (c.totalSpent || 0), 0);
 
     if (repeatKpi) repeatKpi.innerText = repeatClients;
     if (repeatPctKpi) repeatPctKpi.innerText = `${repeatPct}% повторных`;
     if (totalSumKpi) totalSumKpi.innerText = `${allTotalSum.toLocaleString("ru-RU")} ₸`;
-    if (avgCsatKpi) avgCsatKpi.innerHTML = `${avgCsatAll} <span class="max-val">/ 5.0</span>`;
+    if (avgCsatKpi) avgCsatKpi.innerHTML = avgCsatAll !== "—" ? `${avgCsatAll} <span class="max-val">/ 5.0</span>` : "—";
 
     if (!tbody) return;
     tbody.innerHTML = "";
@@ -1298,7 +1307,7 @@ function openClientModal(phoneNumber) {
                             <span class="client-call-meta">📅 ${call.date || ''} в ${call.time || ''}</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="badge badge-success">⭐ CSAT ${call.csat || 5}/5</span>
+                            <span class="badge ${call.csat ? 'badge-success' : 'badge-neutral'}">⭐ CSAT ${call.csat ? call.csat + '/5' : '—'}</span>
                             <span class="badge badge-neutral">⏱️ ${call.duration || "00:00"}</span>
                             <button class="btn-client-call-action" onclick="closeClientModal(); openCallModal(${call.id});">
                                 🎧 Разбор звонка AI
@@ -1465,13 +1474,19 @@ function switchView(viewId) {
     } else if (viewId === "view-managers") {
         if (heading) heading.innerText = "Рейтинг и эффективность менеджеров";
         if (subheading) subheading.innerText = "Показатели CSAT, соблюдения скриптов и тональности по каждому сотруднику";
+        renderManagers(callsData, true);
     } else if (viewId === "view-clients") {
         if (heading) heading.innerText = "Клиентская база и история обращений";
         if (subheading) subheading.innerText = "История звонков каждого клиента, вопросы, потребности и AI-профилирование";
+        renderClients(callsData, true);
     } else if (viewId === "view-audit") {
         if (heading) heading.innerText = "Журнал изменений и аудит данных";
         if (subheading) subheading.innerText = "История ручных корректировок имен менеджеров, городов и параметров звонков";
-        renderAuditLogs(auditLogsData);
+        if (!auditLogsData || auditLogsData.length === 0) {
+            loadAuditData(true);
+        } else {
+            renderAuditLogs(auditLogsData, true);
+        }
     }
 }
 
@@ -1723,11 +1738,12 @@ function openCallModal(callId) {
         openOutcomeBtn.onclick = () => openEditCallModal(call.id);
     }
 
-    const csatVal = Number(call.csat) || 5;
-    document.getElementById("modalCsatStars").innerText = `⭐`.repeat(csatVal) + ` ${csatVal}/5`;
-    document.getElementById("modalManagerPoliteness").innerText = call.managerPoliteness || `${csatVal} / 5`;
+    const hasCsat = (call.csat !== null && call.csat !== undefined && call.csat !== "");
+    const csatVal = hasCsat ? Number(call.csat) : null;
+    document.getElementById("modalCsatStars").innerText = csatVal ? (`⭐`.repeat(Math.round(csatVal)) + ` ${csatVal}/5`) : "Не оценен";
+    document.getElementById("modalManagerPoliteness").innerText = call.managerPoliteness || (csatVal ? `${csatVal} / 5` : "Не оценено");
     document.getElementById("modalConflictStatus").innerText = call.conflict ? "Обнаружен конфликт" : "Не зафиксирован";
-    document.getElementById("modalScriptPct").innerText = `${call.scriptScore || 85}%`;
+    document.getElementById("modalScriptPct").innerText = (call.scriptScore !== null && call.scriptScore !== undefined) ? `${call.scriptScore}%` : "—";
 
     // Вкладка 2: Транскрипция (Диалог)
     initCallAudio(call, false);
@@ -1812,7 +1828,7 @@ function openCallModal(callId) {
 
     if (mgrDomEl) mgrDomEl.innerText = mgrTone.dominant || "Дружелюбие";
     if (mgrDescEl) mgrDescEl.innerText = mgrTone.description || "Приветливый тон, соблюдение корпоративных стандартов";
-    if (mgrPolitEl) mgrPolitEl.innerText = `⭐ ${call.managerPoliteness || '5 / 5'} (Вежливость)`;
+    if (mgrPolitEl) mgrPolitEl.innerText = call.managerPoliteness && !call.managerPoliteness.includes("Не") ? `⭐ ${call.managerPoliteness} (Вежливость)` : "Вежливость: не оценено";
     if (mgrTempoEl) mgrTempoEl.innerText = (call.acoustics && call.acoustics.tempo) || "130 уд/мин";
 
     if (mgrBarsEl) {
@@ -1847,7 +1863,7 @@ function openCallModal(callId) {
     if (clientDomEl) clientDomEl.innerText = clientTone.dominant || "Лояльный";
     if (clientDescEl) clientDescEl.innerText = clientTone.description || "Клиент вовлечен в диалог";
     if (clientShiftEl) clientShiftEl.innerText = `${clientTone.sentimentStart || 'Нейтральный'} ➔ ${clientTone.sentimentEnd || 'Позитивный'}`;
-    if (clientCsatEl) clientCsatEl.innerText = `⭐ ${call.csat || 5} / 5.0`;
+    if (clientCsatEl) clientCsatEl.innerText = (call.csat !== null && call.csat !== undefined && call.csat !== "") ? `⭐ ${Number(call.csat).toFixed(1)} / 5.0` : "Не оценен";
     if (clientConflictEl) {
         clientConflictEl.innerText = call.conflict ? "Обнаружен конфликт" : "Не обнаружено";
         clientConflictEl.style.color = call.conflict ? "#f87171" : "#4ade80";
@@ -2051,6 +2067,13 @@ function initCallAudio(call, autoPlay = false) {
     audio.onerror = (e) => {
         console.warn("[AI CRM Audio] Инфо/Ошибка загрузки аудиозаписи:", e);
         setPlayerBtnState(false);
+        const btnText = document.getElementById("playerBtnText");
+        if (btnText) {
+            btnText.innerText = "⚠️ Файл не найден (404)";
+            setTimeout(() => {
+                btnText.innerText = "Прослушать аудио";
+            }, 4000);
+        }
     };
 
     if (playBtn) {
@@ -2061,6 +2084,13 @@ function initCallAudio(call, autoPlay = false) {
                 }).catch(err => {
                     console.warn("[AI CRM Audio] Ошибка воспроизведения:", err);
                     setPlayerBtnState(false);
+                    const btnText = document.getElementById("playerBtnText");
+                    if (btnText) {
+                        btnText.innerText = "⚠️ Аудио недоступно на диске";
+                        setTimeout(() => {
+                            btnText.innerText = "Прослушать аудио";
+                        }, 4000);
+                    }
                 });
             } else {
                 audio.pause();
@@ -2653,34 +2683,45 @@ async function loadCallsData(keepPage = true) {
             renderCallsTable(callsData, keepPage);
             renderDashboard(callsData);
             renderManagers(callsData, keepPage);
-            renderClients(callsData, keepPage);
+            try {
+                renderClients(callsData, keepPage);
+            } catch (errClients) {
+                console.error("[AI CRM] Ошибка в renderClients:", errClients);
+            }
             console.log("[AI CRM] Загружены актуальные звонки (всего:", callsData.length, ")");
             checkUrlCallHash();
         }
 
-        // 3. Журнал аудита (REST API -> audit_data.json)
-        try {
-            const resAudit = await fetch("/api/audit?t=" + Date.now());
-            if (resAudit.ok) {
-                freshAudit = await resAudit.json();
-            }
-        } catch (e) {}
-
-        if (!freshAudit || !Array.isArray(freshAudit)) {
-            try {
-                const resAuditStatic = await fetch("audit_data.json?t=" + Date.now());
-                if (resAuditStatic.ok) {
-                    freshAudit = await resAuditStatic.json();
-                }
-            } catch (e) {}
-        }
-
-        if (Array.isArray(freshAudit)) {
-            auditLogsData = freshAudit;
-            renderAuditLogs(auditLogsData, keepPage);
-        }
+        // 3. Журнал аудита
+        await loadAuditData(keepPage);
     } catch (err) {
         console.warn("[AI CRM] Ошибка загрузки данных:", err);
+    }
+}
+
+// Загрузка журнала изменений из REST API с фолбэком на audit_data.json
+async function loadAuditData(keepPage = true) {
+    let freshAudit = null;
+    try {
+        const resAudit = await fetch("/api/audit?t=" + Date.now());
+        if (resAudit.ok) {
+            freshAudit = await resAudit.json();
+        }
+    } catch (e) {}
+
+    if (!freshAudit || !Array.isArray(freshAudit) || freshAudit.length === 0) {
+        try {
+            const resAuditStatic = await fetch("audit_data.json?t=" + Date.now());
+            if (resAuditStatic.ok) {
+                freshAudit = await resAuditStatic.json();
+            }
+        } catch (e) {}
+    }
+
+    if (Array.isArray(freshAudit)) {
+        auditLogsData = freshAudit;
+        renderAuditLogs(auditLogsData, keepPage);
+        console.log("[AI CRM] Загружен журнал аудита (всего:", auditLogsData.length, ")");
     }
 }
 

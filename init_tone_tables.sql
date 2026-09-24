@@ -124,7 +124,11 @@ CREATE INDEX IF NOT EXISTS idx_audio_segments_call_id ON call_audio_segments(cal
 CREATE INDEX IF NOT EXISTS idx_sentiment_lines_call_id ON call_text_sentiment_lines(call_id);
 CREATE INDEX IF NOT EXISTS idx_customer_sentiment_call_id ON customer_sentiment(call_id);
 
--- Обновление существующей таблицы call_transcriptions новыми полями классификации
+-- Обновление существующей таблицы call_transcriptions новыми полями классификации и очереди
 ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS call_category VARCHAR(64) DEFAULT 'Прочее / Консультация';
 ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS call_subcategory VARCHAR(64) DEFAULT 'Общие вопросы';
 ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS call_tags JSONB DEFAULT '[]';
+ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS retry_count INT DEFAULT 0;
+ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS last_error TEXT;
+ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ;
+ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT '[]';

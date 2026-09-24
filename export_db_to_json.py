@@ -48,7 +48,11 @@ def detect_manager_name(text):
         return m2.group(1).capitalize()
 
     # 4. Проверка известных имен в начале диалога
-    names = ["Жандос", "Руслан", "Азамат", "Данияр", "Айбек", "Ербол", "Максим", "Алексей"]
+    names = [
+        "Диас", "Фарид", "Рустем", "Нуржан", "Жандос", "Владислав", 
+        "Руслан", "Азамат", "Данияр", "Айбек", "Ербол", "Максим", 
+        "Алексей", "Ерасыл", "Айнур"
+    ]
     first_block = text[:300]
     for n in names:
         if re.search(rf'\b{n}\b', first_block, re.I):
@@ -57,11 +61,26 @@ def detect_manager_name(text):
     return "Оператор"
 
 def detect_city(text):
+    text_lower = (text or "").lower()
     cities = ["Алматы", "Астана", "Шымкент", "Караганда", "Актобе", "Тараз", "Павлодар", "Усть-Каменогорск", "Семей", "Атырау", "Костанай", "Кызылорда", "Уральск", "Петропавловск", "Актау"]
     for c in cities:
-        if c.lower() in text.lower():
+        if c.lower() in text_lower:
             return c
-    return "Алматы"
+    return None
+
+def detect_season(text):
+    text_lower = (text or "").lower()
+    if "нешип" in text_lower or "не шип" in text_lower or "липуч" in text_lower or "фрикцион" in text_lower:
+        return "Зимние фрикционные (липучка)"
+    elif "шип" in text_lower or "шипован" in text_lower:
+        return "Зимние шипованные"
+    elif "всесезон" in text_lower:
+        return "Всесезонные"
+    elif "летн" in text_lower or "лето" in text_lower:
+        return "Летние"
+    elif "зимн" in text_lower or "зима" in text_lower:
+        return "Зимние"
+    return None
 
 def detect_tire_details(text):
     text_str = text or ""
@@ -184,7 +203,7 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 cs.customer_sentiment_start, cs.customer_sentiment_end, cs.satisfaction_score, cs.manager_politeness, cs.conflict_detected, cs.conflict_reason, cs.tone_summary,
                 t.sale_status, t.order_sum, t.has_upsell, t.upsell_sum, t.upsell_text, t.service_booking, t.service_date,
                 t.client_name, t.car_model, t.tire_brand, t.tire_size, t.tire_season, t.tire_count, t.branch_address, t.payment_method, t.lost_reason, t.call_summary,
-                t.call_category, t.call_subcategory, t.call_tags
+                t.call_category, t.call_subcategory, t.call_tags, t.checklist
             FROM call_transcriptions t
             LEFT JOIN call_audio_features af ON t.id = af.call_id
             LEFT JOIN call_audio_emotions ae ON t.id = ae.call_id
@@ -215,15 +234,15 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             speech_tempo = float(r[16]) if r[16] is not None else 130.0
             active_sec = float(r[17]) if r[17] is not None else 0.0
 
-            dominant_emotion = r[18] or "Радость"
-            emotion_conf = float(r[19]) if r[19] is not None else 75.0
-            happy_score = float(r[20]) if r[20] is not None else 70.0
-            neutral_score = float(r[21]) if r[21] is not None else 20.0
-            sad_score = float(r[22]) if r[22] is not None else 10.0
+            dominant_emotion = r[18] or "Не определено"
+            emotion_conf = float(r[19]) if r[19] is not None else 0.0
+            happy_score = float(r[20]) if r[20] is not None else 0.0
+            neutral_score = float(r[21]) if r[21] is not None else 0.0
+            sad_score = float(r[22]) if r[22] is not None else 0.0
             angry_score = float(r[23]) if r[23] is not None else 0.0
 
-            csat = int(r[26]) if r[26] is not None else 5
-            manager_politeness = int(r[27]) if r[27] is not None else 5
+            csat = int(r[26]) if r[26] is not None else None
+            manager_politeness = int(r[27]) if r[27] is not None else None
             conflict = bool(r[28]) if r[28] is not None else False
             summary = r[30] if len(r) > 30 and r[30] else (raw_text[:200] + "..." if raw_text else "Транскрипция звонка.")
 
@@ -308,6 +327,12 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             db_category = r[48] if len(r) > 48 and r[48] else None
             db_subcategory = r[49] if len(r) > 49 and r[49] else None
             db_tags = r[50] if len(r) > 50 and r[50] else None
+            db_checklist = r[51] if len(r) > 51 and r[51] else None
+            if isinstance(db_checklist, str):
+                try:
+                    db_checklist = json.loads(db_checklist)
+                except Exception:
+                    db_checklist = None
 
             # Если классификация еще не установлена в БД, высчитываем ее
             if not db_category or db_category == 'Прочее / Консультация':
@@ -343,32 +368,48 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             direction = "out" if is_outgoing else "in"
             direction_label = "Исходящий звонок" if is_outgoing else "Входящий звонок"
 
-            # 7 показателей чек-листа скрипта
-            greet_passed = (manager_name != "Оператор") or ("эйкос" in raw_text.lower()) or ("здравствуйт" in raw_text.lower()) or ("добрый" in raw_text.lower())
-            needs_passed = ("размер" in raw_text.lower()) or ("зимн" in raw_text.lower()) or ("летн" in raw_text.lower()) or (tire_size_str != "205/55 R16") or ("радиус" in raw_text.lower())
-            present_passed = ("шин" in raw_text.lower() or "колес" in raw_text.lower() or "комплект" in raw_text.lower()) and ("тенге" in raw_text.lower() or "стоит" in raw_text.lower() or "цена" in raw_text.lower() or "тысяч" in raw_text.lower() or brand_name != "—")
-            objection_passed = (not conflict) or ("предлож" in raw_text.lower() or "склад" in raw_text.lower() or "филиал" in raw_text.lower() or "вариант" in raw_text.lower() or "можем" in raw_text.lower())
-            closing_passed = ("до свидан" in raw_text.lower() or "всего добр" in raw_text.lower() or "хорошего" in raw_text.lower() or "бронь" in raw_text.lower() or "заказ" in raw_text.lower() or "приезжайте" in raw_text.lower() or "ждем" in raw_text.lower() or city_name != "")
-            prof_passed = (manager_politeness >= 4) and (angry_score <= 10)
-            upsell_passed = ("хранени" in raw_text.lower()) or ("монтаж" in raw_text.lower()) or ("гаранти" in raw_text.lower()) or ("балансировк" in raw_text.lower())
-            
-            checklist = [
-                { "title": "Приветствие", "desc": f"Представился: «Компания Эйкос, {manager_name}»" if greet_passed else "Не назвал компанию / не представился", "passed": greet_passed },
-                { "title": "Выявления потребностей", "desc": f"Уточнил параметры и типоразмер: {tire_size_str}" if needs_passed else "Потребность и типоразмер не уточнены", "passed": needs_passed },
-                { "title": "Презентация", "desc": f"Презентовал варианты шин ({brand_name}), озвучил стоимость" if present_passed else "Презентация вариантов шин не проведена", "passed": present_passed },
-                { "title": "Работа с возражениями", "desc": "Отработал вопросы и сомнения по наличию/складу, предложил альтернативы" if objection_passed else "Не отработаны сомнения/претензия клиента", "passed": objection_passed },
-                { "title": "Окончание разговора", "desc": f"Зафиксировал договоренность (город {city_name or 'Алматы'}), вежливо попрощался" if closing_passed else "Не зафиксирован итог / нет вежливого прощания", "passed": closing_passed },
-                { "title": "Профессиональный подход", "desc": f"Оценка вежливости {manager_politeness}/5, соблюдение делового этикета" if prof_passed else "Зафиксированы замечания к культуре речи", "passed": prof_passed },
-                { "title": "Доп прдажа", "desc": "Предложил сопутствующие услуги (хранение шин / шиномонтаж)" if upsell_passed else "Не предложены сопутствующие услуги (хранение/монтаж)", "passed": upsell_passed }
-            ]
+            text_lower = raw_text.lower()
+            greet_passed = bool(manager_name and manager_name not in ["Оператор", "Не определен"]) or any(k in text_lower for k in ["эйкос", "компания эйкос", "добрый день", "здравствуйте", "доброе утро"])
+            needs_passed = bool(tire_size_str) or any(k in text_lower for k in ["какой размер", "какой радиус", "какой автомобиль", "какая машина", "шипы или", "сезон"])
+            present_passed = bool(brand_name) and any(k in text_lower for k in ["тенге", "стоит", "цена", "тысяч", "вариант", "предложить", "в наличии"])
+            objection_passed = (not conflict) and any(k in text_lower for k in ["предлож", "склад", "филиал", "вариант", "можем", "доставк", "посмотр"])
+            closing_passed = any(k in text_lower for k in ["до свидания", "всего доброго", "хорошего дня", "всего хорошего", "до встречи", "обращайтесь"])
+            prof_passed = ((manager_politeness is not None and manager_politeness >= 4) or (manager_politeness is None and not conflict)) and (angry_score <= 15)
+            upsell_passed = has_upsell or any(k in text_lower for k in ["хранени", "шиномонтаж", "монтаж", "балансировк", "диск", "датчик", "пакет", "гаранти"])
+
+            if db_checklist and isinstance(db_checklist, list) and len(db_checklist) > 0:
+                checklist = []
+                for item in db_checklist:
+                    title = item.get("title") or item.get("key", "Критерий")
+                    quote = str(item.get("quote", "")).strip()
+                    comment = str(item.get("comment", "")).strip()
+                    if quote:
+                        desc = f"Цитата: «{quote}» • {comment}" if comment else f"Цитата: «{quote}»"
+                    else:
+                        desc = comment or ("Выполнено" if item.get("passed") else "Не выполнено")
+                    checklist.append({
+                        "title": title,
+                        "desc": desc,
+                        "passed": bool(item.get("passed", False))
+                    })
+            else:
+                checklist = [
+                    { "title": "Приветствие", "desc": f"Представился: «Компания Эйкос, {manager_name}»" if greet_passed else "Не назвал компанию / не представился", "passed": greet_passed },
+                    { "title": "Выявления потребностей", "desc": f"Уточнил параметры и типоразмер: {tire_size_str or 'запрошен клиентом'}" if needs_passed else "Потребность и типоразмер не уточнены", "passed": needs_passed },
+                    { "title": "Презентация", "desc": f"Презентовал варианты шин ({brand_name or 'в наличии'}), озвучил стоимость" if present_passed else "Презентация вариантов шин не проведена", "passed": present_passed },
+                    { "title": "Работа с возражениями", "desc": "Отработал вопросы и сомнения по наличию/складу, предложил альтернативы" if objection_passed else "Не отработаны сомнения/претензия клиента", "passed": objection_passed },
+                    { "title": "Окончание разговора", "desc": "Вежливо попрощался и подвел итог" if closing_passed else "Не зафиксирован итог / нет вежливого прощания", "passed": closing_passed },
+                    { "title": "Профессиональный подход", "desc": f"Оценка вежливости {manager_politeness}/5, соблюдение делового этикета" if (manager_politeness and prof_passed) else ("Соблюдение делового этикета" if prof_passed else "Зафиксированы замечания к культуре речи"), "passed": prof_passed },
+                    { "title": "Доп прдажа", "desc": "Предложил сопутствующие услуги (хранение шин / шиномонтаж)" if upsell_passed else "Не предложены сопутствующие услуги (хранение/монтаж)", "passed": upsell_passed }
+                ]
 
             script_score = int((sum(1 for i in checklist if i["passed"]) / len(checklist)) * 100)
 
             mgr_lines = [d for d in dialogue if d.get("role") == "manager"]
             client_lines = [d for d in dialogue if d.get("role") == "client"]
 
-            mgr_total = len(mgr_lines) or 1
-            client_total = len(client_lines) or 1
+            mgr_total = len(mgr_lines)
+            client_total = len(client_lines)
 
             mgr_pos = sum(1 for d in mgr_lines if d.get("sentiment") == "positive")
             mgr_neu = sum(1 for d in mgr_lines if d.get("sentiment") == "neutral")
@@ -378,29 +419,29 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             client_neu = sum(1 for d in client_lines if d.get("sentiment") == "neutral")
             client_neg = sum(1 for d in client_lines if d.get("sentiment") == "negative")
 
-            if conflict:
-                client_sad_pct = max(round((client_neg / client_total) * 100), 25)
-                client_happy_pct = min(round((client_pos / client_total) * 100), 40)
+            # Честный расчет процентного соотношения реплик без искусственного завышения
+            if client_total > 0:
+                client_sad_pct = round((client_neg / client_total) * 100) if client_neg > 0 else 0
+                client_happy_pct = round((client_pos / client_total) * 100) if client_pos > 0 else 0
                 client_neutral_pct = max(100 - client_happy_pct - client_sad_pct, 0)
             else:
-                client_sad_pct = round((client_neg / client_total) * 100) if client_neg > 0 else 0
-                if csat >= 4:
-                    client_happy_pct = max(round((client_pos / client_total) * 100), 85)
-                else:
-                    client_happy_pct = max(round((client_pos / client_total) * 100), 60)
-                client_neutral_pct = max(100 - client_happy_pct - client_sad_pct, 0)
+                client_sad_pct = 0
+                client_happy_pct = 0
+                client_neutral_pct = 100
 
-            mgr_sad_pct = round((mgr_neg / mgr_total) * 100) if mgr_neg > 0 else 0
-            mgr_happy_pct = max(round((mgr_pos / mgr_total) * 100), 80 if manager_politeness >= 4 else 60)
-            mgr_neutral_pct = max(100 - mgr_happy_pct - mgr_sad_pct, 0)
+            if mgr_total > 0:
+                mgr_sad_pct = round((mgr_neg / mgr_total) * 100) if mgr_neg > 0 else 0
+                mgr_happy_pct = round((mgr_pos / mgr_total) * 100) if mgr_pos > 0 else 0
+                mgr_neutral_pct = max(100 - mgr_happy_pct - mgr_sad_pct, 0)
+            else:
+                mgr_sad_pct = 0
+                mgr_happy_pct = 0
+                mgr_neutral_pct = 100
 
-            cust_start = str(r[24]) if len(r) > 24 and r[24] is not None else "Нейтральный"
-            cust_end = str(r[25]) if len(r) > 25 and r[25] is not None else ("Позитивный" if csat >= 4 else "Нейтральный")
+            cust_start = str(r[24]) if len(r) > 24 and r[24] is not None else "Не определено"
+            cust_end = str(r[25]) if len(r) > 25 and r[25] is not None else "Не определено"
 
-            if not conflict:
-                if angry_score > 0:
-                    neutral_score = round(neutral_score + angry_score, 2)
-                    angry_score = 0.0
+            season_val = db_tire_season or detect_season(raw_text) or "Не указано"
 
             calls.append({
                 "id": call_id,
@@ -417,18 +458,18 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 "carModel": db_car_model or "Не указано",
                 "tireBrand": brand_name,
                 "tireSize": tire_size_str,
-                "tireSeason": db_tire_season or "Зимние шины",
+                "tireSeason": season_val,
                 "tireCount": db_tire_count or "4 шт.",
                 "branchAddress": db_branch_address or (f"г. {city_name}" if city_name else "Филиал Aikos"),
                 "paymentMethod": db_payment_method or "Оплата при получении",
                 "lostReason": db_lost_reason or "",
                 "callSummary": db_call_summary or summary,
                 "topic": topic_str,
-                "city": city_name,
+                "city": city_name or "Не указан",
                 "callCategory": call_category,
                 "callSubcategory": call_subcategory,
                 "callTags": call_tags,
-                "productCat": db_tire_season or "Зимние шины",
+                "productCat": season_val,
                 "orderSum": order_sum,
                 "outcome": sale_status,
                 "saleStatus": sale_status,
@@ -444,7 +485,7 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 "scriptScore": script_score,
                 "status": "Обработан",
                 "statusClass": "badge-success",
-                "managerPoliteness": f"{manager_politeness} / 5",
+                "managerPoliteness": f"{manager_politeness} / 5" if manager_politeness is not None else "Не оценено",
                 "conflict": conflict,
                 "conflictReason": r[29] if len(r) > 29 and r[29] else ("Клиент выразил недовольство условиями" if conflict else None),
                 "summary": summary,
@@ -460,10 +501,10 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                     "neutral": mgr_neutral_pct,
                     "sad": mgr_sad_pct,
                     "angry": 0,
-                    "politeness": f"{manager_politeness} / 5",
+                    "politeness": f"{manager_politeness} / 5" if manager_politeness is not None else "Не оценено",
                     "politenessScore": manager_politeness,
-                    "dominant": "Дружелюбие и клиентоориентированность" if mgr_happy_pct >= 60 else "Спокойный деловой тон",
-                    "description": "Приветливый тон, уверенные ответы без конфликтов и раздражения"
+                    "dominant": "Дружелюбие и клиентоориентированность" if mgr_happy_pct >= 50 else ("Спокойный деловой тон" if mgr_neutral_pct >= 50 else "Сдержанный тон"),
+                    "description": "Приветливый тон, уверенные ответы без конфликтов" if not conflict else "Зафиксировано напряжение в диалоге"
                 },
                 "clientTone": {
                     "happy": client_happy_pct,
@@ -473,8 +514,8 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                     "csat": csat,
                     "sentimentStart": cust_start.capitalize(),
                     "sentimentEnd": cust_end.capitalize(),
-                    "dominant": "Лояльный и удовлетворенный" if client_happy_pct >= 60 else "Нейтральная заинтересованность",
-                    "description": f"Настроение: от «{cust_start}» в начале до «{cust_end}» в конце диалога"
+                    "dominant": "Лояльный и удовлетворенный" if client_happy_pct >= 50 else ("Нейтральная заинтересованность" if client_neutral_pct >= 50 else "Сдержанный/настороженный"),
+                    "description": f"Настроение: от «{cust_start}» в начале до «{cust_end}» в конце диалога" if cust_start != "Не определено" else "Тон не анализировался"
                 },
                 "acoustics": {
                     "rms": f"{mean_rms:.4f}",
