@@ -40,9 +40,12 @@ def update_call_details(data: CallUpdateRequest) -> CallUpdateResponse:
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # 0. Обеспечиваем наличие колонки unique_id в call_audit_logs
+                cur.execute("ALTER TABLE call_audit_logs ADD COLUMN IF NOT EXISTS unique_id VARCHAR(64);")
+
                 # 1. Получаем текущие сохраненные данные
                 cur.execute("""
-                    SELECT manager_name, city_name, sale_status, order_sum, has_upsell, upsell_sum, upsell_text, service_booking, service_date 
+                    SELECT unique_id, manager_name, city_name, sale_status, order_sum, has_upsell, upsell_sum, upsell_text, service_booking, service_date 
                     FROM call_transcriptions 
                     WHERE id = %s;
                 """, (call_id,))
@@ -50,15 +53,16 @@ def update_call_details(data: CallUpdateRequest) -> CallUpdateResponse:
                 if not row:
                     raise HTTPException(status_code=404, detail=f"Звонок с ID {call_id} не найден в базе данных")
 
-                old_manager = row[0] or "Оператор"
-                old_city = row[1] or "Алматы"
-                old_sale = row[2] or "Консультация"
-                old_order_sum = row[3] or "0 ₸"
-                old_has_upsell = bool(row[4])
-                old_upsell_sum = row[5] or "0 ₸"
-                old_upsell_text = row[6] or ""
-                old_service = row[7] or "Нет"
-                old_service_date = row[8] or ""
+                unique_id = row[0]
+                old_manager = row[1] or "Оператор"
+                old_city = row[2] or "Алматы"
+                old_sale = row[3] or "Консультация"
+                old_order_sum = row[4] or "0 ₸"
+                old_has_upsell = bool(row[5])
+                old_upsell_sum = row[6] or "0 ₸"
+                old_upsell_text = row[7] or ""
+                old_service = row[8] or "Нет"
+                old_service_date = row[9] or ""
 
                 sale_status = data.sale_status if data.sale_status is not None else old_sale
                 order_sum = data.order_sum if data.order_sum is not None else old_order_sum
@@ -96,35 +100,35 @@ def update_call_details(data: CallUpdateRequest) -> CallUpdateResponse:
                 # 3. Логируем изменения менеджера
                 if old_manager != new_manager:
                     cur.execute("""
-                        INSERT INTO call_audit_logs (call_id, field_name, old_value, new_value, changed_by, comment)
-                        VALUES (%s, 'manager_name', %s, %s, %s, %s);
-                    """, (call_id, old_manager, new_manager, changed_by, comment))
+                        INSERT INTO call_audit_logs (call_id, unique_id, field_name, old_value, new_value, changed_by, comment)
+                        VALUES (%s, %s, 'manager_name', %s, %s, %s, %s);
+                    """, (call_id, unique_id, old_manager, new_manager, changed_by, comment))
 
                 # 4. Логируем изменения города
                 if old_city != new_city:
                     cur.execute("""
-                        INSERT INTO call_audit_logs (call_id, field_name, old_value, new_value, changed_by, comment)
-                        VALUES (%s, 'city_name', %s, %s, %s, %s);
-                    """, (call_id, old_city, new_city, changed_by, comment))
+                        INSERT INTO call_audit_logs (call_id, unique_id, field_name, old_value, new_value, changed_by, comment)
+                        VALUES (%s, %s, 'city_name', %s, %s, %s, %s);
+                    """, (call_id, unique_id, old_city, new_city, changed_by, comment))
 
                 # 5. Логируем изменения продажи / статуса
                 if old_sale != sale_status:
                     cur.execute("""
-                        INSERT INTO call_audit_logs (call_id, field_name, old_value, new_value, changed_by, comment)
-                        VALUES (%s, 'sale_status', %s, %s, %s, %s);
-                    """, (call_id, old_sale, sale_status, changed_by, comment))
+                        INSERT INTO call_audit_logs (call_id, unique_id, field_name, old_value, new_value, changed_by, comment)
+                        VALUES (%s, %s, 'sale_status', %s, %s, %s, %s);
+                    """, (call_id, unique_id, old_sale, sale_status, changed_by, comment))
 
                 if old_order_sum != order_sum:
                     cur.execute("""
-                        INSERT INTO call_audit_logs (call_id, field_name, old_value, new_value, changed_by, comment)
-                        VALUES (%s, 'order_sum', %s, %s, %s, %s);
-                    """, (call_id, old_order_sum, order_sum, changed_by, comment))
+                        INSERT INTO call_audit_logs (call_id, unique_id, field_name, old_value, new_value, changed_by, comment)
+                        VALUES (%s, %s, 'order_sum', %s, %s, %s, %s);
+                    """, (call_id, unique_id, old_order_sum, order_sum, changed_by, comment))
 
                 if old_service != service_booking:
                     cur.execute("""
-                        INSERT INTO call_audit_logs (call_id, field_name, old_value, new_value, changed_by, comment)
-                        VALUES (%s, 'service_booking', %s, %s, %s, %s);
-                    """, (call_id, old_service, service_booking, changed_by, comment))
+                        INSERT INTO call_audit_logs (call_id, unique_id, field_name, old_value, new_value, changed_by, comment)
+                        VALUES (%s, %s, 'service_booking', %s, %s, %s, %s);
+                    """, (call_id, unique_id, old_service, service_booking, changed_by, comment))
 
                 conn.commit()
 

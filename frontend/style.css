@@ -1445,6 +1445,12 @@ body {
     background: rgba(239, 68, 68, 0.03);
 }
 
+.checklist-row.na {
+    border-left: 4px solid #64748b;
+    background: rgba(100, 116, 139, 0.05);
+    opacity: 0.85;
+}
+
 .chk-status {
     width: 28px;
     height: 28px;
@@ -1467,6 +1473,12 @@ body {
     background: rgba(239, 68, 68, 0.15);
     color: #f87171;
     border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.checklist-row.na .chk-status {
+    background: rgba(100, 116, 139, 0.15);
+    color: #94a3b8;
+    border: 1px solid rgba(100, 116, 139, 0.35);
 }
 
 .chk-details {

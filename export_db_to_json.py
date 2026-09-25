@@ -150,9 +150,10 @@ def export_audit_logs_to_json(output_file=DEFAULT_AUDIT_JSON, write_to_file=True
             SELECT 
                 l.id, l.call_id, l.field_name, l.old_value, l.new_value, 
                 l.changed_by, l.changed_at, l.comment,
-                t.phone, t.call_date, t.call_time, t.manager_name
+                t.phone, t.call_date, t.call_time, t.manager_name,
+                COALESCE(l.unique_id, t.unique_id) as unique_id
             FROM call_audit_logs l
-            LEFT JOIN call_transcriptions t ON l.call_id = t.id
+            LEFT JOIN call_transcriptions t ON (l.unique_id IS NOT NULL AND l.unique_id = t.unique_id) OR (l.call_id = t.id)
             ORDER BY l.id DESC;
         """)
         rows = cursor.fetchall()
@@ -163,6 +164,7 @@ def export_audit_logs_to_json(output_file=DEFAULT_AUDIT_JSON, write_to_file=True
             logs.append({
                 "id": r[0],
                 "callId": r[1],
+                "uniqueId": r[12] or "—",
                 "fieldName": r[2],
                 "fieldLabel": field_ru,
                 "oldValue": r[3] or "—",
@@ -400,18 +402,26 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                         quote = str(item.get("quote", "")).strip()
                         comment = str(item.get("comment", "")).strip()
                         status_val = str(item.get("status", "")).lower()
-                        is_passed = bool(item.get("passed", False)) or status_val in ["passed", "ok", "true", "выполнено"]
+                        is_na = status_val in ["not_applicable", "na", "n/a", "не применимо"] or (item.get("passed") is None and status_val not in ["passed", "failed"])
+                        
+                        if is_na:
+                            is_passed = None
+                        else:
+                            is_passed = bool(item.get("passed", False)) or status_val in ["passed", "ok", "true", "выполнено"]
                     elif isinstance(item, str):
                         raw_title = item
                         quote = ""
                         comment = ""
                         is_passed = True
+                        is_na = False
                     else:
                         continue
 
                     title = re.sub(r"^\d+\.\s*", "", str(raw_title)).strip()
 
-                    if quote and quote not in ["Не предложено", "—", "null"]:
+                    if is_na:
+                        desc = comment or "Не применимо к данному типу обращения"
+                    elif quote and quote not in ["Не предложено", "—", "null"]:
                         desc = f"«{quote}»" + (f" • {comment}" if comment and comment != quote else "")
                     else:
                         desc = comment or ("Выполнено" if is_passed else "Не выполнено")
@@ -419,20 +429,26 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                     checklist.append({
                         "title": title or raw_title,
                         "desc": desc,
-                        "passed": is_passed
+                        "passed": is_passed,
+                        "status": "not_applicable" if is_na else ("passed" if is_passed else "failed"),
+                        "not_applicable": is_na
                     })
             else:
                 checklist = [
-                    { "title": "Приветствие", "desc": f"Представился: «Компания Эйкос, {manager_name}»" if greet_passed else "Не назвал компанию / не представился", "passed": greet_passed },
-                    { "title": "Выявления потребностей", "desc": f"Уточнил параметры и типоразмер: {tire_size_str or 'запрошен клиентом'}" if needs_passed else "Потребность и типоразмер не уточнены", "passed": needs_passed },
-                    { "title": "Презентация", "desc": f"Презентовал варианты шин ({brand_name or 'в наличии'}), озвучил стоимость" if present_passed else "Презентация вариантов шин не проведена", "passed": present_passed },
-                    { "title": "Работа с возражениями", "desc": "Отработал вопросы и сомнения по наличию/складу, предложил альтернативы" if objection_passed else "Не отработаны сомнения/претензия клиента", "passed": objection_passed },
-                    { "title": "Окончание разговора", "desc": "Вежливо попрощался и подвел итог" if closing_passed else "Не зафиксирован итог / нет вежливого прощания", "passed": closing_passed },
-                    { "title": "Профессиональный подход", "desc": f"Оценка вежливости {manager_politeness}/5, соблюдение делового этикета" if (manager_politeness and prof_passed) else ("Соблюдение делового этикета" if prof_passed else "Зафиксированы замечания к культуре речи"), "passed": prof_passed },
-                    { "title": "Доп прдажа", "desc": "Предложил сопутствующие услуги (хранение шин / шиномонтаж)" if upsell_passed else "Не предложены сопутствующие услуги (хранение/монтаж)", "passed": upsell_passed }
+                    { "title": "Приветствие", "desc": f"Представился: «Компания Эйкос, {manager_name}»" if greet_passed else "Не назвал компанию / не представился", "passed": greet_passed, "status": "passed" if greet_passed else "failed", "not_applicable": False },
+                    { "title": "Выявления потребностей", "desc": f"Уточнил параметры и типоразмер: {tire_size_str or 'запрошен клиентом'}" if needs_passed else "Потребность и типоразмер не уточнены", "passed": needs_passed, "status": "passed" if needs_passed else "failed", "not_applicable": False },
+                    { "title": "Презентация", "desc": f"Презентовал варианты шин ({brand_name or 'в наличии'}), озвучил стоимость" if present_passed else "Презентация вариантов шин не проведена", "passed": present_passed, "status": "passed" if present_passed else "failed", "not_applicable": False },
+                    { "title": "Работа с возражениями", "desc": "Отработал вопросы и сомнения по наличию/складу, предложил альтернативы" if objection_passed else "Не отработаны сомнения/претензия клиента", "passed": objection_passed, "status": "passed" if objection_passed else "failed", "not_applicable": False },
+                    { "title": "Окончание разговора", "desc": "Вежливо попрощался и подвел итог" if closing_passed else "Не зафиксирован итог / нет вежливого прощания", "passed": closing_passed, "status": "passed" if closing_passed else "failed", "not_applicable": False },
+                    { "title": "Профессиональный подход", "desc": f"Оценка вежливости {manager_politeness}/5, соблюдение делового этикета" if (manager_politeness and prof_passed) else ("Соблюдение делового этикета" if prof_passed else "Зафиксированы замечания к культуре речи"), "passed": prof_passed, "status": "passed" if prof_passed else "failed", "not_applicable": False },
+                    { "title": "Доп прдажа", "desc": "Предложил сопутствующие услуги (хранение шин / шиномонтаж)" if upsell_passed else "Не предложены сопутствующие услуги (хранение/монтаж)", "passed": upsell_passed, "status": "passed" if upsell_passed else "failed", "not_applicable": False }
                 ]
 
-            script_score = int((sum(1 for i in checklist if i["passed"]) / len(checklist)) * 100)
+            applicable_items = [i for i in checklist if not i.get("not_applicable") and i.get("passed") is not None]
+            if applicable_items:
+                script_score = int((sum(1 for i in applicable_items if i["passed"]) / len(applicable_items)) * 100)
+            else:
+                script_score = 100
 
             mgr_lines = [d for d in dialogue if d.get("role") == "manager"]
             client_lines = [d for d in dialogue if d.get("role") == "client"]
@@ -440,18 +456,20 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             mgr_total = len(mgr_lines)
             client_total = len(client_lines)
 
-            mgr_pos = sum(1 for d in mgr_lines if d.get("sentiment") == "positive")
-            mgr_neu = sum(1 for d in mgr_lines if d.get("sentiment") == "neutral")
-            mgr_neg = sum(1 for d in mgr_lines if d.get("sentiment") == "negative")
+            mgr_pos = sum(1 for d in mgr_lines if d.get("sentiment") == "positive" or d.get("emotion") == "Радость")
+            mgr_neu = sum(1 for d in mgr_lines if d.get("sentiment") == "neutral" or d.get("emotion") == "Нейтральный")
+            mgr_neg = sum(1 for d in mgr_lines if d.get("sentiment") == "negative" or d.get("emotion") in ["Гнев", "Раздражение", "Грусть"])
+            mgr_angry_cnt = sum(1 for d in mgr_lines if str(d.get("emotion", "")).lower() in ["гнев", "раздражение", "angry"])
 
-            client_pos = sum(1 for d in client_lines if d.get("sentiment") == "positive")
-            client_neu = sum(1 for d in client_lines if d.get("sentiment") == "neutral")
-            client_neg = sum(1 for d in client_lines if d.get("sentiment") == "negative")
+            client_pos = sum(1 for d in client_lines if d.get("sentiment") == "positive" or d.get("emotion") == "Радость")
+            client_neu = sum(1 for d in client_lines if d.get("sentiment") == "neutral" or d.get("emotion") == "Нейтральный")
+            client_neg = sum(1 for d in client_lines if d.get("sentiment") == "negative" or d.get("emotion") in ["Гнев", "Раздражение", "Грусть"])
+            client_angry_cnt = sum(1 for d in client_lines if str(d.get("emotion", "")).lower() in ["гнев", "раздражение", "angry"])
 
             # Честный расчет процентного соотношения реплик без искусственного завышения
             # Разделяем негатив клиента: при конфликте/раздражении отправляем в angry, иначе в sad
             client_neg_pct = round((client_neg / client_total) * 100) if (client_total > 0 and client_neg > 0) else 0
-            if conflict or angry_score > 0 or (r[25] and "недовольн" in str(r[25]).lower()):
+            if conflict or client_angry_cnt > 0 or angry_score > 0 or (r[25] and "недовольн" in str(r[25]).lower()):
                 client_angry_pct = client_neg_pct
                 client_sad_pct = 0
             else:
@@ -461,9 +479,10 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             client_happy_pct = round((client_pos / client_total) * 100) if (client_total > 0 and client_pos > 0) else 0
             client_neutral_pct = max(100 - client_happy_pct - client_sad_pct - client_angry_pct, 0)
 
+            # Эмоции менеджера: опираемся на реальные реплики менеджера, а не вешаем флаг конфликта на спокойного сотрудника
             mgr_neg_pct = round((mgr_neg / mgr_total) * 100) if (mgr_total > 0 and mgr_neg > 0) else 0
-            mgr_angry_pct = mgr_neg_pct if conflict else 0
-            mgr_sad_pct = 0 if conflict else mgr_neg_pct
+            mgr_angry_pct = round((mgr_angry_cnt / mgr_total) * 100) if (mgr_total > 0 and mgr_angry_cnt > 0) else 0
+            mgr_sad_pct = max(mgr_neg_pct - mgr_angry_pct, 0)
             mgr_happy_pct = round((mgr_pos / mgr_total) * 100) if (mgr_total > 0 and mgr_pos > 0) else 0
             mgr_neutral_pct = max(100 - mgr_happy_pct - mgr_sad_pct - mgr_angry_pct, 0)
 

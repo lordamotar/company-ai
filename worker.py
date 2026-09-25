@@ -290,6 +290,10 @@ def detect_manager_from_text(text):
     return "Оператор"
 
 
+# Нарастающая пауза повторов при ошибках: 1 минута -> 5 минут -> 15 минут
+RETRY_DELAYS = [60, 300, 900]
+
+
 def get_call_record(unique_id, filename=None):
     """Возвращает информацию о звонке из БД для проверки статуса очереди."""
     try:
@@ -297,13 +301,13 @@ def get_call_record(unique_id, filename=None):
         cur = conn.cursor()
         if filename:
             cur.execute("""
-                SELECT id, status, retry_count, last_error, text
+                SELECT id, status, retry_count, last_error, text, processing_started_at
                 FROM call_transcriptions
                 WHERE unique_id = %s OR source_file = %s;
             """, (unique_id, filename))
         else:
             cur.execute("""
-                SELECT id, status, retry_count, last_error, text
+                SELECT id, status, retry_count, last_error, text, processing_started_at
                 FROM call_transcriptions
                 WHERE unique_id = %s;
             """, (unique_id,))
@@ -317,7 +321,8 @@ def get_call_record(unique_id, filename=None):
             "status": row[1],
             "retry_count": row[2] or 0,
             "last_error": row[3],
-            "text": row[4]
+            "text": row[4],
+            "processing_started_at": row[5]
         }
     except Exception as e:
         logging.warning(f"Ошибка чтения статуса звонка из БД: {e}")
@@ -607,8 +612,8 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
       "name": "1. Приветствие по стандарту компании",
       "title": "Приветствие",
       "status": "passed" | "failed",
-      "passed": true,
-      "score": 100,
+      "passed": <true/false>,
+      "score": <100 если passed, 0 если failed>,
       "quote": "точная цитата приветствия менеджера с именем и компанией",
       "comment": "пояснение"
     },
@@ -617,8 +622,8 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
       "name": "2. Выявление потребностей",
       "title": "Выявления потребностей",
       "status": "passed" | "failed",
-      "passed": true,
-      "score": 100,
+      "passed": <true/false>,
+      "score": <100 если passed, 0 если failed>,
       "quote": "точная цитата вопросов менеджера по авто/типоразмеру",
       "comment": "пояснение"
     },
@@ -626,10 +631,10 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
       "id": 3,
       "name": "3. Презентация товара / ценности",
       "title": "Презентация",
-      "status": "passed" | "failed",
-      "passed": true,
-      "score": 100,
-      "quote": "точная цитата презентации вариантов шин и цен",
+      "status": "passed" | "failed" | "not_applicable",
+      "passed": <true/false/null>,
+      "score": <100 если passed, 0 если failed, null если not_applicable>,
+      "quote": "точная цитата презентации вариантов шин и цен либо 'Не применимо'",
       "comment": "пояснение"
     },
     {
@@ -637,19 +642,19 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
       "name": "4. Отработка возражений / вопросов",
       "title": "Работа с возражениями",
       "status": "passed" | "failed",
-      "passed": true,
-      "score": 100,
-      "quote": "точная цитата ответа на сомнения или вопросы наличия",
+      "passed": <true/false>,
+      "score": <100 если passed, 0 если failed>,
+      "quote": "точная цитата ответа на сомнения или вопросы наличия/претензии",
       "comment": "пояснение"
     },
     {
       "id": 5,
       "name": "5. Дополнительная продажа (Upsell)",
       "title": "Доп прдажа",
-      "status": "passed" | "failed",
-      "passed": false,
-      "score": 0,
-      "quote": "точная цитата предложения допуслуг либо 'Не предложено'",
+      "status": "passed" | "failed" | "not_applicable",
+      "passed": <true/false/null>,
+      "score": <100 если passed, 0 если failed, null если not_applicable>,
+      "quote": "точная цитата предложения допуслуг либо 'Не предложено' / 'Не применимо'",
       "comment": "пояснение"
     },
     {
@@ -657,8 +662,8 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
       "name": "6. Профессиональный подход",
       "title": "Профессиональный подход",
       "status": "passed" | "failed",
-      "passed": true,
-      "score": 100,
+      "passed": <true/false>,
+      "score": <100 если passed, 0 если failed>,
       "quote": "точная цитата вежливой фразы менеджера, отражающей культуру речи",
       "comment": "пояснение"
     },
@@ -667,8 +672,8 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
       "name": "7. Окончание разговора и фиксация",
       "title": "Окончание разговора",
       "status": "passed" | "failed",
-      "passed": true,
-      "score": 100,
+      "passed": <true/false>,
+      "score": <100 если passed, 0 если failed>,
       "quote": "точная цитата договоренности и вежливого прощания",
       "comment": "пояснение"
     }
@@ -683,7 +688,8 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
 2. НИКАКИХ выдуманных дефолтов! Если город не был назван — строго null. Если сезон не назван — строго null. Если клиент сказал «нешипованные» или «липучка» — это «Зимние фрикционные (липучка)».
 3. Оценки CSAT (целое число от 1 до 5) и вежливости менеджера (целое число от 1 до 5, где 5 — безупречная вежливость, 1 — грубость) должны быть ЧЕСТНЫМИ и ОБЪЕКТИВНЫМИ по факту разговора. НИКАКИХ фиксированных 4 и 5 по умолчанию!
 4. sale_status выбирается строго из 4 вариантов: "Продажа состоялась", "Бронь оформлена", "Отказ от покупки", "Консультация".
-5. В чек-листе ОБЯЗАТЕЛЬНО указывать и "title", и "name", и логическое поле "passed" (true/false), а также приводить РЕАЛЬНЫЕ цитаты («quote») из речи участников.
+5. В чек-листе ОБЯЗАТЕЛЬНО указывать и "title", и "name", и "status" ("passed" | "failed" | "not_applicable"), и логическое поле "passed" (true | false | null), а также приводить РЕАЛЬНЫЕ цитаты («quote») из речи участников:
+   - ВНИМАНИЕ ДЛЯ ЗВОНКОВ-ЖАЛОБ И СПЕЦИФИЧЕСКИХ ОБРАЩЕНИЙ: если звонок является претензией, жалобой или не связан с продажей товара, пункты «3. Презентация товара / ценности» и «5. Дополнительная продажа (Upsell)» являются неуместными. В таких случаях ОБЯЗАТЕЛЬНО ставь для них "status": "not_applicable", "passed": null, "score": null! Не штрафуй менеджера за отсутствие продажи в звонке по жалобе.
 """
 
 
@@ -886,6 +892,21 @@ def process_file(file_path):
                     logging.warning(f"Не удалось переместить {filename} в {ERROR_DIR}: {e}")
             return
 
+        # Проверка нарастающей паузы повтора (1 -> 5 -> 15 минут)
+        if rec and rec["status"] == "retry_pending" and rec.get("retry_count", 0) > 0:
+            cur_r = rec["retry_count"]
+            delay_sec = RETRY_DELAYS[min(cur_r - 1, len(RETRY_DELAYS) - 1)]
+            started_at = rec.get("processing_started_at")
+            if started_at:
+                now_utc = datetime.now(timezone.utc)
+                if started_at.tzinfo is None:
+                    started_at = started_at.replace(tzinfo=timezone.utc)
+                elapsed = (now_utc - started_at).total_seconds()
+                if elapsed < delay_sec:
+                    remaining = int(delay_sec - elapsed)
+                    logging.info(f"Файл {filename} ожидает нарастающую паузу повтора (попытка {cur_r}/{MAX_RETRIES}, пауза {max(1, delay_sec // 60)} мин, осталось {remaining} сек). Пропускаем.")
+                    return
+
         # Перемещаем файл в processing/
         processing_file = os.path.join(PROCESSING_DIR, filename)
         if os.path.abspath(file_path) != os.path.abspath(processing_file) and os.path.exists(file_path):
@@ -965,7 +986,16 @@ def process_file(file_path):
                 except Exception as e:
                     logging.error(f"Не удалось переместить {filename} в {ERROR_DIR}: {e}")
             else:
-                logging.info(f"[!] Файл {filename} сохранен в очереди со статусом {status} для повторной попытки.")
+                delay_sec = RETRY_DELAYS[min(cur_retries - 1, len(RETRY_DELAYS) - 1)]
+                logging.info(f"[!] Файл {filename} возвращен в incoming/ со статусом {status}. Следующая попытка через {max(1, delay_sec // 60)} мин (пауза {delay_sec} сек).")
+                inc_dest = os.path.join(INCOMING_DIR, filename)
+                try:
+                    if os.path.exists(processing_file):
+                        if os.path.exists(inc_dest):
+                            os.remove(inc_dest)
+                        shutil.move(processing_file, inc_dest)
+                except Exception as e:
+                    logging.error(f"Не удалось переместить {filename} в {INCOMING_DIR}: {e}")
 
     finally:
         with _processing_lock:
@@ -1006,7 +1036,45 @@ def scan_and_process_pending():
             process_file(full_p)
 
 
+def return_errors_to_incoming():
+    """Возвращает все файлы из error/ обратно в incoming/ и сбрасывает счетчики ошибок в БД."""
+    logging.info("=== Возврат файлов из error/ в очередь incoming/ ===")
+    conn = psycopg2.connect(**DB_CONFIG)
+    cur = conn.cursor()
+    cnt = 0
+    if os.path.exists(ERROR_DIR):
+        for fname in os.listdir(ERROR_DIR):
+            ext = os.path.splitext(fname)[1].lower()
+            if ext in AUDIO_EXTENSIONS:
+                src = os.path.join(ERROR_DIR, fname)
+                dst = os.path.join(INCOMING_DIR, fname)
+                try:
+                    if os.path.exists(dst):
+                        os.remove(dst)
+                    shutil.move(src, dst)
+                    parsed = parse_filename(fname, file_path=src)
+                    uid = parsed.get("unique_id", "")
+                    cur.execute("""
+                        UPDATE call_transcriptions
+                        SET status = 'new', retry_count = 0, last_error = NULL
+                        WHERE source_file = %s OR unique_id = %s;
+                    """, (fname, uid))
+                    cnt += 1
+                    logging.info(f"[+] Файл {fname} возвращен из error/ в incoming/ (счетчик попыток сброшен).")
+                except Exception as ex:
+                    logging.error(f"[-] Ошибка возврата {fname}: {ex}")
+    conn.commit()
+    cur.close()
+    conn.close()
+    logging.info(f"=== Завершено: {cnt} файлов возвращено в incoming/ ===")
+    return cnt
+
+
 def main():
+    if "--retry-errors" in sys.argv:
+        return_errors_to_incoming()
+        return
+
     logging.info("Запуск COMPANY AI - CALL WATCHER (Надежная очередь, ротация ключей, повторы)")
 
     for d in [INCOMING_DIR, PROCESSING_DIR, PROCESSED_DIR, ERROR_DIR, TRANSCRIPTIONS_DIR]:

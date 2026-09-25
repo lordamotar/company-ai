@@ -1914,8 +1914,10 @@ function openCallModal(callId) {
 
     // Вкладка 4: Чек-лист скрипта (все 7 показателей)
     const checklist = getCallChecklist(call);
-    const passedCount = checklist.filter(item => item.passed).length;
-    const scorePct = Math.round((passedCount / checklist.length) * 100);
+    const applicableItems = checklist.filter(item => !item.not_applicable && item.passed !== null);
+    const passedCount = applicableItems.filter(item => item.passed).length;
+    const totalApplicable = applicableItems.length || 1;
+    const scorePct = Math.round((passedCount / totalApplicable) * 100);
 
     const checklistContainer = document.getElementById("tab-checklist");
     if (checklistContainer) {
@@ -1932,22 +1934,29 @@ function openCallModal(callId) {
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span class="badge ${scorePct >= 80 ? 'badge-success' : (scorePct >= 60 ? 'badge-primary' : 'badge-warning')}" style="font-size: 13px; padding: 6px 12px; font-weight: 700;">
-                            Соблюдение: ${scorePct}% (${passedCount} из 7)
+                            Соблюдение: ${scorePct}% (${passedCount} из ${applicableItems.length}${applicableItems.length < checklist.length ? ` • ${checklist.length - applicableItems.length} не применимо` : ''})
                         </span>
                     </div>
                 </div>
 
                 <div class="checklist-items" id="modalChecklistItems">
-                    ${checklist.map((item, idx) => `
-                        <div class="checklist-row ${item.passed ? "passed" : "failed"}">
-                            <div class="chk-status">${item.passed ? "✓" : "✗"}</div>
+                    ${checklist.map((item, idx) => {
+                        const isNa = item.not_applicable || item.passed === null;
+                        const rowClass = isNa ? "na" : (item.passed ? "passed" : "failed");
+                        const statusIcon = isNa ? "—" : (item.passed ? "✓" : "✗");
+                        const badgeClass = isNa ? "badge-secondary" : (item.passed ? "badge-success" : "badge-warning");
+                        const badgeText = isNa ? "Не применимо" : (item.passed ? "Выполнено" : "Не выполнено");
+                        return `
+                        <div class="checklist-row ${rowClass}">
+                            <div class="chk-status">${statusIcon}</div>
                             <div class="chk-details">
                                 <div class="chk-title">${idx + 1}. ${item.title}</div>
                                 <div class="chk-desc">${item.desc}</div>
                             </div>
-                            <span class="badge ${item.passed ? "badge-success" : "badge-warning"}">${item.passed ? "Выполнено" : "Не выполнено"}</span>
+                            <span class="badge ${badgeClass}">${badgeText}</span>
                         </div>
-                    `).join("")}
+                        `;
+                    }).join("")}
                 </div>
             </div>
         `;

@@ -42,7 +42,28 @@ def get_rubert_classifier():
         from transformers import pipeline
         model_name = "blanchefort/rubert-base-cased-sentiment"
         _RUBERT_CLASSIFIER = pipeline("sentiment-analysis", model=model_name)
-    return _RUBERT_CLASSIFIER
+def safe_parse_int_score(val, min_val=1, max_val=5):
+    """
+    Безопасно парсит числовую оценку (CSAT, вежливость) через float() в try/except.
+    Корректно обрабатывает дробные строки ('4.5'), форматы '4/5', проценты и плейсхолдеры.
+    """
+    if val is None:
+        return None
+    try:
+        if isinstance(val, (int, float)):
+            f_val = float(val)
+        else:
+            s_val = str(val).strip()
+            m = re.search(r'\d+(?:\.\d+)?', s_val)
+            if not m:
+                return None
+            f_val = float(m.group(0))
+
+        if f_val > 5:
+            f_val = f_val / 20.0
+        return max(min_val, min(max_val, round(f_val)))
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------
@@ -565,8 +586,8 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
             call_id,
             data.get("customer_sentiment_start") or ("нейтральный" if content else "не проанализировано"),
             data.get("customer_sentiment_end") or ("нейтральный" if content else "не проанализировано"),
-            int(data["satisfaction_score"]) if data.get("satisfaction_score") is not None else None,
-            int(data["manager_politeness"]) if data.get("manager_politeness") is not None else None,
+            safe_parse_int_score(data.get("satisfaction_score")),
+            safe_parse_int_score(data.get("manager_politeness")),
             bool(data.get("conflict_detected", False)),
             data.get("conflict_reason") if data.get("conflict_detected") else None,
             data.get("tone_summary", data.get("call_summary", "Тон не проанализирован (сбой LLM)" if not content else "Разговор завершен."))
@@ -866,16 +887,8 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
         """, (call_id, dom_emotion, dom_conf, happy_score, neutral_score, sad_score, angry_score))
 
         # 4. Общая удовлетворенность (customer_sentiment)
-        csat = ov.get("satisfaction_score")
-        raw_politeness = ov.get("manager_politeness")
-        politeness = None
-        if raw_politeness is not None:
-            try:
-                p_val = int(raw_politeness)
-                politeness = max(1, min(5, round(p_val / 20))) if p_val > 5 else max(1, min(5, p_val))
-            except Exception:
-                politeness = None
-
+        csat = safe_parse_int_score(ov.get("satisfaction_score"))
+        politeness = safe_parse_int_score(ov.get("manager_politeness"))
         conflict = bool(ov.get("conflict_detected", False))
         conflict_reason = ov.get("conflict_reason") if conflict else None
         summary = ov.get("tone_summary", "")
@@ -899,8 +912,8 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
             call_id,
             ov.get("customer_sentiment_start", "нейтральный"),
             ov.get("customer_sentiment_end", "удовлетворенный"),
-            int(csat) if csat is not None else None,
-            int(politeness) if politeness is not None else None,
+            csat,
+            politeness,
             conflict,
             conflict_reason,
             summary

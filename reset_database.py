@@ -18,7 +18,39 @@ def clear_all():
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
 
-    # Таблицы для полной очистки каскадом (call_audit_logs не трогаем, чтобы не терять разметку РОПа)
+    # Убеждаемся, что в call_audit_logs есть unique_id и нет каскадного FK на call_transcriptions
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS call_audit_logs (
+                id SERIAL PRIMARY KEY,
+                call_id INT,
+                unique_id VARCHAR(64),
+                field_name VARCHAR(64),
+                old_value TEXT,
+                new_value TEXT,
+                changed_by VARCHAR(64),
+                changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                comment TEXT
+            );
+            ALTER TABLE call_audit_logs ADD COLUMN IF NOT EXISTS unique_id VARCHAR(64);
+            DO $$
+            DECLARE r RECORD;
+            BEGIN
+                FOR r IN (
+                    SELECT constraint_name 
+                    FROM information_schema.table_constraints 
+                    WHERE table_name = 'call_audit_logs' AND constraint_type = 'FOREIGN KEY'
+                ) LOOP
+                    EXECUTE 'ALTER TABLE call_audit_logs DROP CONSTRAINT IF EXISTS ' || quote_ident(r.constraint_name);
+                END LOOP;
+            END $$;
+        """)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logging.warning(f"[-] Проверка структуры call_audit_logs: {e}")
+
+    # Таблицы для полной очистки каскадом БЕЗ RESTART IDENTITY (call_audit_logs не трогаем, чтобы не терять разметку РОПа)
     tables = [
         "call_text_sentiment_lines",
         "call_audio_segments",
@@ -30,7 +62,8 @@ def clear_all():
 
     for tbl in tables:
         try:
-            cur.execute(f"TRUNCATE TABLE {tbl} RESTART IDENTITY CASCADE;")
+            # Очищаем без RESTART IDENTITY, чтобы call_id не сбивали нумерацию и не привязывались к чужим записям
+            cur.execute(f"TRUNCATE TABLE {tbl} CASCADE;")
             logging.info(f"[+] Таблица {tbl} успешно очищена.")
         except Exception as e:
             logging.warning(f"[-] Не удалось очистить таблицу {tbl}: {e}")
@@ -41,20 +74,25 @@ def clear_all():
     cur.close()
     conn.close()
 
-    # Очистка фронтенд JSON файлов
+    # Очистка фронтенд JSON файла звонков (audit_data.json сохраняем)
     base_dir = os.path.dirname(os.path.abspath(__file__))
     calls_json = os.path.join(base_dir, "frontend", "calls_data.json")
-    audit_json = os.path.join(base_dir, "frontend", "audit_data.json")
 
-    for f_path in [calls_json, audit_json]:
-        try:
-            with open(f_path, "w", encoding="utf-8") as f:
-                json.dump([], f, ensure_ascii=False, indent=2)
-            logging.info(f"[+] Файл {f_path} очищен (установлен пустой список []).")
-        except Exception as e:
-            logging.warning(f"[-] Ошибка очистки файла {f_path}: {e}")
+    try:
+        with open(calls_json, "w", encoding="utf-8") as f:
+            json.dump([], f, ensure_ascii=False, indent=2)
+        logging.info(f"[+] Файл {calls_json} очищен (установлен пустой список []).")
+    except Exception as e:
+        logging.warning(f"[-] Ошибка очистки файла {calls_json}: {e}")
 
-    logging.info("=== База данных и фронтенд успешно сброшены в исходное состояние (с нуля). ===")
+    try:
+        from export_db_to_json import export_audit_logs_to_json
+        export_audit_logs_to_json(write_to_file=True)
+        logging.info("[+] Журнал аудита сохранен и синхронизирован с frontend/audit_data.json.")
+    except Exception as e:
+        logging.warning(f"[-] Ошибка обновления audit_data.json: {e}")
+
+    logging.info("=== База данных и фронтенд успешно сброшены в исходное состояние (с нуля). Журнал аудита РОПа сохранен. ===")
 
 if __name__ == "__main__":
     clear_all()
