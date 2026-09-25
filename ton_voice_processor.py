@@ -69,6 +69,16 @@ def safe_parse_int_score(val, min_val=1, max_val=5):
 # ---------------------------------------------------------
 # 1. Тон-войс 1: Физический акустический анализ (громкость, тишина, темп)
 # ---------------------------------------------------------
+
+_EMOTION_COLUMN_READY = False
+
+def ensure_emotion_column(cursor):
+    """Добавляет колонку emotion в call_text_sentiment_lines (один раз за процесс)."""
+    global _EMOTION_COLUMN_READY
+    if not _EMOTION_COLUMN_READY:
+        cursor.execute("ALTER TABLE call_text_sentiment_lines ADD COLUMN IF NOT EXISTS emotion VARCHAR(32);")
+        _EMOTION_COLUMN_READY = True
+
 def process_audio_features(call_id, file_path, cursor):
     try:
         import librosa
@@ -826,6 +836,7 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
         """, (call_id, mean_rms, max_rms, loud_pct, silence_sec, silence_pct, tempo_wpm, active_sec))
 
         # 2 & 3. Сегменты диалога и честное распределение эмоций реплик (без wav2vec2 и rubert)
+        ensure_emotion_column(cursor)
         cursor.execute("DELETE FROM call_text_sentiment_lines WHERE call_id = %s;", (call_id,))
         cursor.execute("DELETE FROM call_audio_segments WHERE call_id = %s;", (call_id,))
 
@@ -842,9 +853,9 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
 
             sent_label = "ПОЗИТИВ" if sent == "positive" else ("НЕГАТИВ" if sent == "negative" else "НЕЙТРАЛЬНЫЙ")
             cursor.execute("""
-                INSERT INTO call_text_sentiment_lines (call_id, line_number, speaker, phrase_text, sentiment_label, confidence)
-                VALUES (%s, %s, %s, %s, %s, %s);
-            """, (call_id, idx, spk, phrase_text, sent_label, 0.95))
+                INSERT INTO call_text_sentiment_lines (call_id, line_number, speaker, phrase_text, sentiment_label, confidence, emotion)
+                VALUES (%s, %s, %s, %s, %s, %s, %s);
+            """, (call_id, idx, spk, phrase_text, sent_label, 0.95, em.strip()[:32] or None))
 
             start_s = float(item.get("start_sec", 0.0))
             end_s = float(item.get("end_sec", start_s + 2.5))
@@ -931,6 +942,7 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
         car_model = comm.get("car_model")
         tire_brand = comm.get("tire_brand")
         tire_size = comm.get("tire_size")
+        tire_season = comm.get("tire_season")
         raw_count = comm.get("tire_count")
         tire_count = None
         if raw_count is not None:

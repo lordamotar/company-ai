@@ -132,3 +132,6 @@ ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS retry_count INT DEFAULT
 ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS last_error TEXT;
 ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ;
 ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT '[]';
+
+-- Эмоция каждой реплики из единого анализа Gemini (Нейтральный / Радость / Грусть / Гнев / Раздражение)
+ALTER TABLE call_text_sentiment_lines ADD COLUMN IF NOT EXISTS emotion VARCHAR(32);

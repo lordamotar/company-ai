@@ -195,6 +195,9 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
+        # Колонка эмоции реплик (для старых баз, где миграция еще не применялась)
+        cursor.execute("ALTER TABLE call_text_sentiment_lines ADD COLUMN IF NOT EXISTS emotion VARCHAR(32);")
+        conn.commit()
 
         cursor.execute("""
             SELECT 
@@ -291,7 +294,8 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 mins = int(s[0] // 60)
                 secs = int(s[0] % 60)
                 time_str = f"{mins:02d}:{secs:02d}"
-                seg_em = "happy" if s[2] == "Радость" else ("sad" if s[2] == "Грусть" else "neutral")
+                seg_raw = str(s[2] or "").lower()
+                seg_em = "happy" if "радост" in seg_raw else ("sad" if "груст" in seg_raw else ("angry" if ("гнев" in seg_raw or "раздраж" in seg_raw) else "neutral"))
                 timeline.append({
                     "time": time_str,
                     "emotion": seg_em,
@@ -299,7 +303,7 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 })
 
             cursor.execute("""
-                SELECT line_number, speaker, phrase_text, sentiment_label, confidence
+                SELECT line_number, speaker, phrase_text, sentiment_label, confidence, emotion
                 FROM call_text_sentiment_lines
                 WHERE call_id = %s
                 ORDER BY line_number ASC;
@@ -315,7 +319,8 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                     "speaker": speaker,
                     "role": role,
                     "text": l[2],
-                    "sentiment": sent_class
+                    "sentiment": sent_class,
+                    "emotion": l[5] if len(l) > 5 else None
                 })
 
             if not dialogue and raw_text:
