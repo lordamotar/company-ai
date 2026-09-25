@@ -742,14 +742,51 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
                 if dialogue and dialogue[-1].get("end_sec"):
                     duration = float(dialogue[-1]["end_sec"])
 
-        mgr_sec = float(acoustics.get("manager_speech_sec", 0.0))
-        client_sec = float(acoustics.get("client_speech_sec", 0.0))
-        active_sec = mgr_sec + client_sec
-        if active_sec <= 0:
-            active_sec = duration * 0.8
-        silence_sec = float(acoustics.get("silence_sec", max(0.0, duration - active_sec)))
-        silence_pct = float((silence_sec / duration) * 100) if duration > 0 else 20.0
-        tempo_wpm = float(acoustics.get("speech_tempo_wpm", 125.0))
+        # Проверка и нормализация таймкодов диалога по реальной длительности файла
+        if dialogue and duration > 0:
+            max_reported_end = 0.0
+            for item in dialogue:
+                try:
+                    e_s = float(item.get("end_sec", item.get("start_sec", 0.0)))
+                    if e_s > max_reported_end:
+                        max_reported_end = e_s
+                except Exception:
+                    pass
+
+            # Если модель сбилась и превысила длительность аудиофайла более чем на 5%
+            scale_factor = 1.0
+            if max_reported_end > duration * 1.05:
+                scale_factor = duration / max_reported_end
+                logging.info(f"Таймкоды выходят за рамки аудио ({max_reported_end:.1f}с > {duration:.1f}с). Коэффициент нормализации: {scale_factor:.3f}")
+
+            # Нормализуем секунды реплик
+            for item in dialogue:
+                s_s = float(item.get("start_sec", 0.0)) * scale_factor
+                e_s = float(item.get("end_sec", s_s + 2.5)) * scale_factor
+                item["start_sec"] = round(min(max(0.0, s_s), duration), 1)
+                item["end_sec"] = round(min(max(item["start_sec"] + 0.5, e_s), duration), 1)
+
+        # Вычисление активной речи, тишины и реального темпа речи (слов в минуту) по сегментам
+        total_words = 0
+        total_speech_sec = 0.0
+        if dialogue:
+            for item in dialogue:
+                txt = item.get("text", "")
+                words = [w for w in txt.split() if len(w) > 0]
+                total_words += len(words)
+                s_s = float(item.get("start_sec", 0.0))
+                e_s = float(item.get("end_sec", s_s))
+                total_speech_sec += max(0.0, e_s - s_s)
+
+        active_sec = round(min(total_speech_sec, duration), 1) if total_speech_sec > 0 else round(duration * 0.75, 1)
+        silence_sec = round(max(0.0, duration - active_sec), 1)
+        silence_pct = round((silence_sec / duration) * 100, 1) if duration > 0 else 25.0
+
+        # Точный расчет темпа: (слов / секунд речи) * 60
+        if active_sec > 5 and total_words > 0:
+            tempo_wpm = round((total_words / active_sec) * 60, 1)
+        else:
+            tempo_wpm = float(acoustics.get("speech_tempo_wpm", 125.0))
 
         cursor.execute("""
             INSERT INTO call_audio_features (
@@ -830,7 +867,15 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
 
         # 4. Общая удовлетворенность (customer_sentiment)
         csat = ov.get("satisfaction_score")
-        politeness = ov.get("manager_politeness")
+        raw_politeness = ov.get("manager_politeness")
+        politeness = None
+        if raw_politeness is not None:
+            try:
+                p_val = int(raw_politeness)
+                politeness = max(1, min(5, round(p_val / 20))) if p_val > 5 else max(1, min(5, p_val))
+            except Exception:
+                politeness = None
+
         conflict = bool(ov.get("conflict_detected", False))
         conflict_reason = ov.get("conflict_reason") if conflict else None
         summary = ov.get("tone_summary", "")
@@ -873,8 +918,17 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
         car_model = comm.get("car_model")
         tire_brand = comm.get("tire_brand")
         tire_size = comm.get("tire_size")
-        tire_season = comm.get("tire_season")
-        tire_count = comm.get("tire_count")
+        raw_count = comm.get("tire_count")
+        tire_count = None
+        if raw_count is not None:
+            m_cnt = re.search(r'\d+', str(raw_count))
+            if m_cnt:
+                tire_count = f"{m_cnt.group(0)} шт."
+            elif "комплект" in str(raw_count).lower():
+                tire_count = "4 шт."
+            else:
+                tire_count = str(raw_count).strip()
+
         branch_address = comm.get("branch_address")
         payment_method = comm.get("payment_method")
         lost_reason = comm.get("lost_reason")
@@ -887,8 +941,16 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
         cursor.execute("""
             UPDATE call_transcriptions
             SET text = %s,
-                manager_name = COALESCE(%s, manager_name),
-                city_name = COALESCE(%s, city_name),
+                manager_name = CASE 
+                    WHEN %s IS NOT NULL AND %s != 'Оператор' AND %s != '' 
+                         AND (manager_name IS NULL OR manager_name = 'Оператор') THEN %s
+                    ELSE manager_name 
+                END,
+                city_name = CASE 
+                    WHEN %s IS NOT NULL AND %s != '' 
+                         AND (city_name IS NULL OR city_name = 'Алматы' OR city_name = '') THEN %s
+                    ELSE city_name 
+                END,
                 duration_sec = %s,
                 status = 'completed',
                 last_error = NULL,
@@ -916,8 +978,8 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
             WHERE id = %s;
         """, (
             full_text,
-            manager_name,
-            city_name,
+            manager_name, manager_name, manager_name, manager_name,
+            city_name, city_name, city_name,
             duration,
             sale_status,
             order_sum,

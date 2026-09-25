@@ -243,10 +243,25 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
 
             csat = int(r[26]) if r[26] is not None else None
             manager_politeness = int(r[27]) if r[27] is not None else None
+            if manager_politeness is not None and manager_politeness > 5:
+                # Масштабируем старую 100-балльную шкалу (например 90) в шкалу 1-5
+                manager_politeness = max(1, min(5, round(manager_politeness / 20)))
+
             conflict = bool(r[28]) if r[28] is not None else False
             summary = r[30] if len(r) > 30 and r[30] else (raw_text[:200] + "..." if raw_text else "Транскрипция звонка.")
 
-            sale_status = r[31] if len(r) > 31 and r[31] else "Консультация"
+            raw_sale_status = r[31] if len(r) > 31 and r[31] else "Консультация"
+            status_map = {
+                "Успешная продажа": "Продажа состоялась",
+                "Продажа": "Продажа состоялась",
+                "Заказ": "Продажа состоялась",
+                "Забронировано": "Бронь оформлена",
+                "Бронь": "Бронь оформлена",
+                "Отказ": "Отказ от покупки",
+                "Сброс": "Консультация",
+                "Думает": "Консультация"
+            }
+            sale_status = status_map.get(raw_sale_status, raw_sale_status)
             order_sum = r[32] if len(r) > 32 and r[32] else "0 ₸"
             has_upsell = bool(r[33]) if len(r) > 33 and r[33] is not None else False
             upsell_sum = r[34] if len(r) > 34 and r[34] else "0 ₸"
@@ -380,17 +395,31 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             if db_checklist and isinstance(db_checklist, list) and len(db_checklist) > 0:
                 checklist = []
                 for item in db_checklist:
-                    title = item.get("title") or item.get("key", "Критерий")
-                    quote = str(item.get("quote", "")).strip()
-                    comment = str(item.get("comment", "")).strip()
-                    if quote:
-                        desc = f"Цитата: «{quote}» • {comment}" if comment else f"Цитата: «{quote}»"
+                    if isinstance(item, dict):
+                        raw_title = item.get("title") or item.get("name") or item.get("key", "Критерий")
+                        quote = str(item.get("quote", "")).strip()
+                        comment = str(item.get("comment", "")).strip()
+                        status_val = str(item.get("status", "")).lower()
+                        is_passed = bool(item.get("passed", False)) or status_val in ["passed", "ok", "true", "выполнено"]
+                    elif isinstance(item, str):
+                        raw_title = item
+                        quote = ""
+                        comment = ""
+                        is_passed = True
                     else:
-                        desc = comment or ("Выполнено" if item.get("passed") else "Не выполнено")
+                        continue
+
+                    title = re.sub(r"^\d+\.\s*", "", str(raw_title)).strip()
+
+                    if quote and quote not in ["Не предложено", "—", "null"]:
+                        desc = f"«{quote}»" + (f" • {comment}" if comment and comment != quote else "")
+                    else:
+                        desc = comment or ("Выполнено" if is_passed else "Не выполнено")
+
                     checklist.append({
-                        "title": title,
+                        "title": title or raw_title,
                         "desc": desc,
-                        "passed": bool(item.get("passed", False))
+                        "passed": is_passed
                     })
             else:
                 checklist = [
@@ -420,23 +449,23 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             client_neg = sum(1 for d in client_lines if d.get("sentiment") == "negative")
 
             # Честный расчет процентного соотношения реплик без искусственного завышения
-            if client_total > 0:
-                client_sad_pct = round((client_neg / client_total) * 100) if client_neg > 0 else 0
-                client_happy_pct = round((client_pos / client_total) * 100) if client_pos > 0 else 0
-                client_neutral_pct = max(100 - client_happy_pct - client_sad_pct, 0)
-            else:
+            # Разделяем негатив клиента: при конфликте/раздражении отправляем в angry, иначе в sad
+            client_neg_pct = round((client_neg / client_total) * 100) if (client_total > 0 and client_neg > 0) else 0
+            if conflict or angry_score > 0 or (r[25] and "недовольн" in str(r[25]).lower()):
+                client_angry_pct = client_neg_pct
                 client_sad_pct = 0
-                client_happy_pct = 0
-                client_neutral_pct = 100
-
-            if mgr_total > 0:
-                mgr_sad_pct = round((mgr_neg / mgr_total) * 100) if mgr_neg > 0 else 0
-                mgr_happy_pct = round((mgr_pos / mgr_total) * 100) if mgr_pos > 0 else 0
-                mgr_neutral_pct = max(100 - mgr_happy_pct - mgr_sad_pct, 0)
             else:
-                mgr_sad_pct = 0
-                mgr_happy_pct = 0
-                mgr_neutral_pct = 100
+                client_sad_pct = client_neg_pct
+                client_angry_pct = 0
+
+            client_happy_pct = round((client_pos / client_total) * 100) if (client_total > 0 and client_pos > 0) else 0
+            client_neutral_pct = max(100 - client_happy_pct - client_sad_pct - client_angry_pct, 0)
+
+            mgr_neg_pct = round((mgr_neg / mgr_total) * 100) if (mgr_total > 0 and mgr_neg > 0) else 0
+            mgr_angry_pct = mgr_neg_pct if conflict else 0
+            mgr_sad_pct = 0 if conflict else mgr_neg_pct
+            mgr_happy_pct = round((mgr_pos / mgr_total) * 100) if (mgr_total > 0 and mgr_pos > 0) else 0
+            mgr_neutral_pct = max(100 - mgr_happy_pct - mgr_sad_pct - mgr_angry_pct, 0)
 
             cust_start = str(r[24]) if len(r) > 24 and r[24] is not None else "Не определено"
             cust_end = str(r[25]) if len(r) > 25 and r[25] is not None else "Не определено"
@@ -500,28 +529,28 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                     "happy": mgr_happy_pct,
                     "neutral": mgr_neutral_pct,
                     "sad": mgr_sad_pct,
-                    "angry": 0,
+                    "angry": mgr_angry_pct,
                     "politeness": f"{manager_politeness} / 5" if manager_politeness is not None else "Не оценено",
                     "politenessScore": manager_politeness,
-                    "dominant": "Дружелюбие и клиентоориентированность" if mgr_happy_pct >= 50 else ("Спокойный деловой тон" if mgr_neutral_pct >= 50 else "Сдержанный тон"),
+                    "dominant": "Дружелюбие и клиентоориентированность" if mgr_happy_pct >= 50 else ("Спокойный деловой тон" if mgr_neutral_pct >= 50 else ("Раздражение и напряжение" if mgr_angry_pct > 0 else "Сдержанный тон")),
                     "description": "Приветливый тон, уверенные ответы без конфликтов" if not conflict else "Зафиксировано напряжение в диалоге"
                 },
                 "clientTone": {
                     "happy": client_happy_pct,
                     "neutral": client_neutral_pct,
                     "sad": client_sad_pct,
-                    "angry": 0,
+                    "angry": client_angry_pct,
                     "csat": csat,
                     "sentimentStart": cust_start.capitalize(),
                     "sentimentEnd": cust_end.capitalize(),
-                    "dominant": "Лояльный и удовлетворенный" if client_happy_pct >= 50 else ("Нейтральная заинтересованность" if client_neutral_pct >= 50 else "Сдержанный/настороженный"),
+                    "dominant": "Лояльный и удовлетворенный" if client_happy_pct >= 50 else ("Раздраженный / конфликт" if client_angry_pct >= 20 else ("Нейтральная заинтересованность" if client_neutral_pct >= 50 else "Сдержанный/настороженный")),
                     "description": f"Настроение: от «{cust_start}» в начале до «{cust_end}» в конце диалога" if cust_start != "Не определено" else "Тон не анализировался"
                 },
                 "acoustics": {
                     "rms": f"{mean_rms:.4f}",
                     "silence": f"{silence_sec:.1f} сек ({silence_pct:.1f}%)",
                     "loudMoments": f"{loud_pct:.1f}%",
-                    "tempo": f"{speech_tempo:.1f} уд/мин"
+                    "tempo": f"{speech_tempo:.0f} слов/мин"
                 },
                 "timeline": timeline,
                 "dialogue": dialogue,

@@ -52,14 +52,11 @@ DB_CONFIG = {
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
 FILE_READY_TIMEOUT = int(os.getenv("FILE_READY_TIMEOUT", "30"))
 
-# Список поддерживаемых моделей Google Gemini по приоритету
+# Список поддерживаемых моделей Google Gemini по приоритету (версии 2.5+)
 DEFAULT_GEMINI_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
     "gemini-3.6-flash",
-    "gemini-3.6-pro"
+    "gemini-3.7-flash",
+    "gemini-flash-latest"
 ]
 
 def get_configured_models():
@@ -573,19 +570,19 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
     "client_speech_sec": 35.0
   },
   "overall_sentiment": {
-    "satisfaction_score": 4,
-    "manager_politeness": 90,
-    "customer_sentiment_start": "нейтральный",
-    "customer_sentiment_end": "удовлетворенный",
+    "satisfaction_score": <целое число от 1 до 5 по факту решения вопроса клиента>,
+    "manager_politeness": <целое число от 1 до 5, отражающее культуру речи и вежливость>,
+    "customer_sentiment_start": "нейтральный" | "позитивный" | "раздраженный" | "негативный",
+    "customer_sentiment_end": "удовлетворенный" | "нейтральный" | "недовольный",
     "conflict_detected": false,
     "conflict_reason": null,
     "tone_summary": "краткий вывод 1-2 предложения об эмоциональном фоне и тоне общения"
   },
   "commercial": {
-    "sale_status": "Успешная продажа" | "Отказ" | "Консультация" | "Думает" | "Сброс",
-    "order_sum": "0 ₸",
+    "sale_status": "Продажа состоялась" | "Бронь оформлена" | "Отказ от покупки" | "Консультация",
+    "order_sum": "сумма сделки с ₸ или '0 ₸'",
     "has_upsell": false,
-    "upsell_sum": "0 ₸",
+    "upsell_sum": "сумма допродажи с ₸ или '0 ₸'",
     "upsell_text": "",
     "service_booking": "Да" | "Нет",
     "service_date": "",
@@ -608,74 +605,85 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
     {
       "id": 1,
       "name": "1. Приветствие по стандарту компании",
-      "status": "passed" | "failed" | "not_applicable",
+      "title": "Приветствие",
+      "status": "passed" | "failed",
+      "passed": true,
       "score": 100,
-      "quote": "точная цитата приветствия менеджера",
+      "quote": "точная цитата приветствия менеджера с именем и компанией",
       "comment": "пояснение"
     },
     {
       "id": 2,
       "name": "2. Выявление потребностей",
-      "status": "passed" | "failed" | "not_applicable",
+      "title": "Выявления потребностей",
+      "status": "passed" | "failed",
+      "passed": true,
       "score": 100,
-      "quote": "точная цитата вопросов менеджера",
+      "quote": "точная цитата вопросов менеджера по авто/типоразмеру",
       "comment": "пояснение"
     },
     {
       "id": 3,
       "name": "3. Презентация товара / ценности",
-      "status": "passed" | "failed" | "not_applicable",
+      "title": "Презентация",
+      "status": "passed" | "failed",
+      "passed": true,
       "score": 100,
-      "quote": "точная цитата презентации",
+      "quote": "точная цитата презентации вариантов шин и цен",
       "comment": "пояснение"
     },
     {
       "id": 4,
       "name": "4. Отработка возражений / вопросов",
-      "status": "passed" | "failed" | "not_applicable",
+      "title": "Работа с возражениями",
+      "status": "passed" | "failed",
+      "passed": true,
       "score": 100,
-      "quote": "точная цитата ответа на вопрос/возражение",
+      "quote": "точная цитата ответа на сомнения или вопросы наличия",
       "comment": "пояснение"
     },
     {
       "id": 5,
-      "name": "5. Предложение сопутствующих товаров (Upsell)",
-      "status": "passed" | "failed" | "not_applicable",
+      "name": "5. Дополнительная продажа (Upsell)",
+      "title": "Доп прдажа",
+      "status": "passed" | "failed",
+      "passed": false,
       "score": 0,
-      "quote": "Не предложено",
-      "comment": "Менеджер не предложил сопутствующие товары или услуги"
+      "quote": "точная цитата предложения допуслуг либо 'Не предложено'",
+      "comment": "пояснение"
     },
     {
       "id": 6,
-      "name": "6. Запись на сервис / шиномонтаж",
-      "status": "passed" | "failed" | "not_applicable",
-      "score": 0,
-      "quote": "Не предложено",
+      "name": "6. Профессиональный подход",
+      "title": "Профессиональный подход",
+      "status": "passed" | "failed",
+      "passed": true,
+      "score": 100,
+      "quote": "точная цитата вежливой фразы менеджера, отражающей культуру речи",
       "comment": "пояснение"
     },
     {
       "id": 7,
-      "name": "7. Фиксация договоренности / закрытие сделки",
-      "status": "passed" | "failed" | "not_applicable",
+      "name": "7. Окончание разговора и фиксация",
+      "title": "Окончание разговора",
+      "status": "passed" | "failed",
+      "passed": true,
       "score": 100,
-      "quote": "точная цитата фиксации",
-      "comment": "пояснение"
-    },
-    {
-      "id": 8,
-      "name": "8. Корректное завершение разговора",
-      "status": "passed" | "failed" | "not_applicable",
-      "score": 100,
-      "quote": "точная цитата прощания",
+      "quote": "точная цитата договоренности и вежливого прощания",
       "comment": "пояснение"
     }
   ]
 }
 
 ВАЖНЫЕ ПРАВИЛА:
-1. НИКАКИХ выдуманных дефолтов! Если город не был назван — строго null. Если сезон не назван — строго null. Если клиент сказал «нешипованные» или «липучка» — это «Зимние фрикционные (липучка)».
-2. Оценки CSAT (1-5) и вежливости (0-100) должны быть ЧЕСТНЫМИ и ОБЪЕКТИВНЫМИ по факту разговора.
-3. В чек-листе ОБЯЗАТЕЛЬНО приводить РЕАЛЬНЫЕ цитаты («quote») из речи участников.
+1. ПОЛНАЯ ДОСЛОВНАЯ ТРАНСКРИПЦИЯ (dialogue):
+   - Расшифруй аудиозапись ПОЛНОСТЬЮ И ДОСЛОВНО от первой до последней секунды!
+   - НЕ сокращай, НЕ пересказывай тезисно и НЕ пропускай фразы! Все реплики менеджера и клиента должны быть включены в массив "dialogue".
+   - Для каждой реплики укажи реального говорящего ("Менеджер" или "Клиент"), секунды начала/конца (start_sec, end_sec) и оригинальный текст.
+2. НИКАКИХ выдуманных дефолтов! Если город не был назван — строго null. Если сезон не назван — строго null. Если клиент сказал «нешипованные» или «липучка» — это «Зимние фрикционные (липучка)».
+3. Оценки CSAT (целое число от 1 до 5) и вежливости менеджера (целое число от 1 до 5, где 5 — безупречная вежливость, 1 — грубость) должны быть ЧЕСТНЫМИ и ОБЪЕКТИВНЫМИ по факту разговора. НИКАКИХ фиксированных 4 и 5 по умолчанию!
+4. sale_status выбирается строго из 4 вариантов: "Продажа состоялась", "Бронь оформлена", "Отказ от покупки", "Консультация".
+5. В чек-листе ОБЯЗАТЕЛЬНО указывать и "title", и "name", и логическое поле "passed" (true/false), а также приводить РЕАЛЬНЫЕ цитаты («quote») из речи участников.
 """
 
 
@@ -900,36 +908,20 @@ def process_file(file_path):
                 analysis_data, text = transcribe_and_analyze_with_gemini(processing_file, output_txt_path)
                 logging.info(f"Единый анализ Gemini успешно завершен для {filename}.")
 
-                # Определение менеджера
+                # Определение менеджера: приоритет живому имени из приветствия
                 manager_name = None
-                if data.get("internal_ext"):
-                    manager_name = get_operator_by_extension(data["internal_ext"])
-                if not manager_name and text:
+                if text:
                     manager_name = detect_manager_from_text(text)
-                if not manager_name:
-                    manager_name = "Оператор"
+                if not manager_name and data.get("internal_ext"):
+                    manager_name = get_operator_by_extension(data["internal_ext"])
 
                 # Сохранение всех уровней анализа в БД за одну операцию
                 from ton_voice_processor import save_unified_analysis
                 save_unified_analysis(inserted_id, processing_file, analysis_data, text, manager_name)
 
             except Exception as e_unified:
-                logging.warning(f"Сбой единого вызова Gemini ({e_unified}). Переход на резервный двухэтапный пайплайн...")
-                text = transcribe_with_gemini(processing_file, output_txt_path)
-                manager_name = None
-                if data.get("internal_ext"):
-                    manager_name = get_operator_by_extension(data["internal_ext"])
-                if not manager_name and text:
-                    manager_name = detect_manager_from_text(text)
-                if not manager_name:
-                    manager_name = "Оператор"
-
-                mark_processing_completed(inserted_id, text, manager_name)
-                try:
-                    from ton_voice_processor import process_all_tone_voice
-                    process_all_tone_voice(inserted_id, processing_file, text)
-                except Exception as e:
-                    logging.error(f"Ошибка при анализе Tone of Voice для {filename}: {e}", exc_info=True)
+                logging.error(f"[-] Сбой анализа Gemini для {filename}: {e_unified}. Файл оставляем в очереди на повтор.")
+                raise e_unified
 
             # Безопасный перенос в processed/
             processed_file = os.path.join(PROCESSED_DIR, filename)
@@ -951,6 +943,11 @@ def process_file(file_path):
                 export_calls_to_json(write_to_file=True)
             except Exception as ex:
                 logging.warning(f"Фоновый экспорт в calls_data.json: {ex}")
+
+            logging.info("=" * 60)
+            logging.info(f"[✓ ГОТОВО] Файл {filename} полностью обработан!")
+            logging.info(">>> Ожидание следующего файла в incoming/ (переместите новый файл)...")
+            logging.info("=" * 60)
 
         except Exception as error:
             err_msg = str(error)
