@@ -667,12 +667,15 @@ def process_llm_sentiment(call_id, transcript_text, cursor):
             call_id
         ))
 
-        if mgr_name and mgr_name.strip():
+        # имя от ИИ приводим к реальному сотруднику; неизвестное имя нового менеджера не создаёт
+        from manager_registry import resolve_or_warn
+        mgr_canon = resolve_or_warn(mgr_name, f"звонок #{call_id}") if mgr_name and mgr_name.strip() else None
+        if mgr_canon:
             cursor.execute("""
                 UPDATE call_transcriptions 
                 SET manager_name = %s 
                 WHERE id = %s AND (manager_name IS NULL OR manager_name = 'Оператор');
-            """, (mgr_name.strip().capitalize(), call_id))
+            """, (mgr_canon, call_id))
 
         if city_name and city_name.strip():
             cursor.execute("""

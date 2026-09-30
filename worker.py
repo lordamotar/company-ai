@@ -267,27 +267,30 @@ def parse_filename(filename, file_path=None):
 
 
 def detect_manager_from_text(text):
-    """Fallback-определение имени менеджера из текста диалога."""
+    """Определение имени менеджера из начала диалога.
+    Услышанное имя приводится к реальному сотруднику из managers.json (см. manager_registry.py);
+    искажённые или неизвестные имена НЕ создают «нового менеджера» — вернётся «Оператор»."""
+    from manager_registry import resolve_or_warn, find_in_text
     if not text:
         return "Оператор"
-    m = re.search(r'[«"]?[Ээ]йкос[»"]?\s*[,–-]?\s*([А-ЯЁ][а-яё]{2,})', text)
+    candidates = []
+    m = re.search(r'[«"]?[Ээ]йкос[»"]?\s*[,–-]?\s*([А-ЯЁӘІҢҒҮҰҚӨҺ][а-яёәіңғүұқөһ]{2,})', text)
     if m and m.group(1).lower() not in ["звоню", "слушаю", "добрый", "здравствуйте", "день", "компания"]:
-        return m.group(1).capitalize()
-    m2 = re.search(r'меня\s+([А-ЯЁ][а-яё]{2,})\s+зовут', text, re.I)
+        candidates.append(m.group(1))
+    m2 = re.search(r'меня\s+([А-ЯЁӘІҢҒҮҰҚӨҺ][а-яёәіңғүұқөһ]{2,})\s+зовут', text, re.I)
     if m2:
-        return m2.group(1).capitalize()
-    m3 = re.search(r'меня\s+зовут\s+([А-ЯЁ][а-яё]{2,})', text, re.I)
+        candidates.append(m2.group(1))
+    m3 = re.search(r'меня\s+зовут\s+([А-ЯЁӘІҢҒҮҰҚӨҺ][а-яёәіңғүұқөһ]{2,})', text, re.I)
     if m3:
-        return m3.group(1).capitalize()
-    names = [
-        "Диас", "Фарид", "Рустем", "Нуржан", "Жандос", "Владислав", 
-        "Руслан", "Азамат", "Данияр", "Айбек", "Ербол", "Максим", 
-        "Алексей", "Ерасыл", "Айнур"
-    ]
-    for n in names:
-        if re.search(rf'\b{n}\b', text[:300], re.I):
-            return n
-    return "Оператор"
+        candidates.append(m3.group(1))
+    m4 = re.search(r'оператор\s+([А-ЯЁӘІҢҒҮҰҚӨҺ][а-яёәіңғүұқөһ]{2,})', text[:300], re.I)
+    if m4:
+        candidates.append(m4.group(1))
+    for cand in candidates:
+        canon = resolve_or_warn(cand, "приветствие в записи")
+        if canon:
+            return canon
+    return find_in_text(text) or "Оператор"
 
 
 # Нарастающая пауза повторов при ошибках: 1 минута -> 5 минут -> 15 минут
@@ -400,19 +403,40 @@ def mark_processing_failed(unique_id, error_msg, max_retries=MAX_RETRIES):
 
 def get_gemini_api_keys():
     from dotenv import load_dotenv
-    load_dotenv()
+    # override=True позволяет подхватывать добавленные ключи на лету из .env без перезапуска процесса
+    env_path = os.path.join(BASE_DIR, ".env")
+    if os.path.exists(env_path):
+        load_dotenv(dotenv_path=env_path, override=True)
+    else:
+        load_dotenv(override=True)
+    
+    keys = []
     
     keys_raw = os.environ.get("GEMINI_API_KEYS", "")
-    keys = [k.strip().strip('"').strip("'") for k in re.split(r"[,;\n]+", keys_raw) if k.strip()]
-    
-    if not keys:
-        single_key = os.environ.get("GEMINI_API_KEY", "").strip().strip('"').strip("'")
-        if single_key:
-            keys.append(single_key)
-            
-    for i in range(1, 10):
-        k = os.environ.get(f"GEMINI_API_KEY_{i}", "").strip().strip('"').strip("'")
+    for k in re.split(r"[,;\n]+", keys_raw):
+        k = k.strip().strip('"').strip("'")
         if k and k not in keys:
+            keys.append(k)
+    
+    single_key = os.environ.get("GEMINI_API_KEY", "").strip().strip('"').strip("'")
+    if single_key and single_key not in keys:
+        keys.append(single_key)
+            
+    # Динамический поиск всех переменных GEMINI_API_KEY_<число> (1, 2, 3, 4, 5, 6, 7...)
+    numbered_keys = []
+    pattern = re.compile(r"^GEMINI_API_KEY_(\d+)$")
+    for var_name, var_value in os.environ.items():
+        m = pattern.match(var_name)
+        if m:
+            num = int(m.group(1))
+            val = var_value.strip().strip('"').strip("'")
+            if val:
+                numbered_keys.append((num, val))
+    
+    # Сортируем по номеру ключа (GEMINI_API_KEY_1, GEMINI_API_KEY_2, ...)
+    numbered_keys.sort(key=lambda x: x[0])
+    for _, k in numbered_keys:
+        if k not in keys:
             keys.append(k)
 
     return keys
@@ -424,7 +448,7 @@ def get_current_gemini_key():
     global _current_gemini_key_idx
     keys = get_gemini_api_keys()
     if not keys:
-        raise ValueError("API-ключ Google Gemini не найден в .env (укажите GEMINI_API_KEY или GEMINI_API_KEYS)")
+        raise ValueError("API-ключ Google Gemini не найден в .env (укажите GEMINI_API_KEY, GEMINI_API_KEY_1... или GEMINI_API_KEYS)")
     return keys[_current_gemini_key_idx % len(keys)]
 
 def rotate_gemini_key():
@@ -435,7 +459,7 @@ def rotate_gemini_key():
     _current_gemini_key_idx = (_current_gemini_key_idx + 1) % len(keys)
     next_key = keys[_current_gemini_key_idx]
     masked = next_key[:6] + "..." + next_key[-4:] if len(next_key) > 10 else "***"
-    logging.info(f"Смена API-ключа Gemini на ключ №{_current_gemini_key_idx + 1} ({masked})")
+    logging.info(f"Смена API-ключа Gemini на ключ №{_current_gemini_key_idx + 1}/{len(keys)} ({masked})")
     return next_key
 
 
@@ -475,14 +499,17 @@ def transcribe_with_gemini(file_path, output_txt_path=None):
 
     keys = get_gemini_api_keys()
     max_key_attempts = max(1, len(keys))
+    key_attempt = 0
 
-    for key_attempt in range(max_key_attempts):
+    while key_attempt < max_key_attempts:
+        keys = get_gemini_api_keys()
+        max_key_attempts = max(max_key_attempts, len(keys))
         current_key = get_current_gemini_key()
         client = genai.Client(api_key=current_key)
         audio_file = None
 
         try:
-            logging.info(f"Загрузка аудиофайла {filename} на серверы Google Gemini (Ключ #{_current_gemini_key_idx + 1})...")
+            logging.info(f"Загрузка аудиофайла {filename} на серверы Google Gemini (Ключ #{_current_gemini_key_idx + 1}/{len(keys)})...")
             audio_file = client.files.upload(file=upload_path)
             logging.info(f"Файл {filename} загружен в Gemini API. Имя объекта: {audio_file.name}")
 
@@ -516,10 +543,14 @@ def transcribe_with_gemini(file_path, output_txt_path=None):
         except Exception as e:
             err_msg = str(e)
             if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-                logging.warning(f"Лимит квоты (429) исчерпан на ключе #{_current_gemini_key_idx + 1}.")
+                logging.warning(f"Лимит квоты (429) исчерпан на ключе #{_current_gemini_key_idx + 1}/{len(keys)}.")
+                # Обновляем список ключей из .env на случай, если пользователь только что добавил новый ключ
+                keys = get_gemini_api_keys()
+                max_key_attempts = max(max_key_attempts, len(keys))
                 if len(keys) > 1 and key_attempt < max_key_attempts - 1:
                     rotate_gemini_key()
                     time.sleep(1)
+                    key_attempt += 1
                     continue
                 else:
                     logging.error("Все доступные ключи Gemini исчерпали лимит (429).")
@@ -611,9 +642,9 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
       "id": 1,
       "name": "1. Приветствие по стандарту компании",
       "title": "Приветствие",
-      "status": "passed" | "failed",
-      "passed": <true/false>,
-      "score": <100 если passed, 0 если failed>,
+      "status": "passed" | "failed" | "not_applicable",
+      "passed": <true/false/null>,
+      "score": <100 если passed, 0 если failed, null если not_applicable>,
       "quote": "точная цитата приветствия менеджера с именем и компанией",
       "comment": "пояснение"
     },
@@ -689,6 +720,7 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
 3. Оценки CSAT (целое число от 1 до 5) и вежливости менеджера (целое число от 1 до 5, где 5 — безупречная вежливость, 1 — грубость) должны быть ЧЕСТНЫМИ и ОБЪЕКТИВНЫМИ по факту разговора. НИКАКИХ фиксированных 4 и 5 по умолчанию!
 4. sale_status выбирается строго из 4 вариантов: "Продажа состоялась", "Бронь оформлена", "Отказ от покупки", "Консультация".
 5. В чек-листе ОБЯЗАТЕЛЬНО указывать и "title", и "name", и "status" ("passed" | "failed" | "not_applicable"), и логическое поле "passed" (true | false | null), а также приводить РЕАЛЬНЫЕ цитаты («quote») из речи участников:
+   - ПРИВЕТСТВИЕ И АРТЕФАКТЫ РАСПОЗНАВАНИЯ: из-за шума, тихой речи, плохой связи и казахского акцента имя менеджера и название компании «Эйкос» в записи часто искажаются (например, «Дельта компаниясы», «Айкос», чужие имена) или не слышны совсем. Проверяй только ФАКТ приветствия, а не то, какое имя или компания прозвучали. Если менеджер поздоровался и/или попытался представиться — этап «1. Приветствие» пройден ("status": "passed", "passed": true, "score": 100), даже если имя или компания не распознаны или распознаны неверно. В comment и quote этого этапа НИКОГДА не пиши, что менеджер назвал чужое/неверное имя или другую компанию. "failed" ставь только если менеджер вообще не поздоровался и никак не представился (например, ответил «Да?», «Слушаю»). Если это внутренний разговор сотрудников (коллега, филиал, партнёр, а не клиент) — ставь "status": "not_applicable", "passed": null, "score": null.
    - ВНИМАНИЕ ДЛЯ ЗВОНКОВ-ЖАЛОБ И СПЕЦИФИЧЕСКИХ ОБРАЩЕНИЙ: если звонок является претензией, жалобой или не связан с продажей товара, пункты «3. Презентация товара / ценности» и «5. Дополнительная продажа (Upsell)» являются неуместными. В таких случаях ОБЯЗАТЕЛЬНО ставь для них "status": "not_applicable", "passed": null, "score": null! Не штрафуй менеджера за отсутствие продажи в звонке по жалобе.
 """
 
@@ -727,14 +759,17 @@ def transcribe_and_analyze_with_gemini(file_path, output_txt_path=None):
 
     keys = get_gemini_api_keys()
     max_key_attempts = max(1, len(keys))
+    key_attempt = 0
 
-    for key_attempt in range(max_key_attempts):
+    while key_attempt < max_key_attempts:
+        keys = get_gemini_api_keys()
+        max_key_attempts = max(max_key_attempts, len(keys))
         current_key = get_current_gemini_key()
         client = genai.Client(api_key=current_key)
         audio_file = None
 
         try:
-            logging.info(f"Загрузка аудиофайла {filename} для единого анализа Gemini (Ключ #{_current_gemini_key_idx + 1})...")
+            logging.info(f"Загрузка аудиофайла {filename} для единого анализа Gemini (Ключ #{_current_gemini_key_idx + 1}/{len(keys)})...")
             audio_file = client.files.upload(file=upload_path)
             logging.info(f"Файл {filename} загружен в Gemini API. Имя объекта: {audio_file.name}")
 
@@ -785,10 +820,14 @@ def transcribe_and_analyze_with_gemini(file_path, output_txt_path=None):
         except Exception as e:
             err_msg = str(e)
             if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-                logging.warning(f"Лимит квоты (429) исчерпан на ключе #{_current_gemini_key_idx + 1}.")
+                logging.warning(f"Лимит квоты (429) исчерпан на ключе #{_current_gemini_key_idx + 1}/{len(keys)}.")
+                # Обновляем список ключей из .env на случай добавления новых ключей
+                keys = get_gemini_api_keys()
+                max_key_attempts = max(max_key_attempts, len(keys))
                 if len(keys) > 1 and key_attempt < max_key_attempts - 1:
                     rotate_gemini_key()
                     time.sleep(1)
+                    key_attempt += 1
                     continue
                 else:
                     logging.error("Все доступные ключи Gemini исчерпали лимит (429).")
@@ -879,6 +918,26 @@ def process_file(file_path):
                 except Exception as e:
                     logging.warning(f"Не удалось переместить {filename} в {PROCESSED_DIR}: {e}")
             return
+
+        # Если файл был повторно помещен пользователем в incoming/, а ранее был failed - даем ему новый шанс
+        is_in_incoming = os.path.dirname(os.path.abspath(file_path)).lower() == os.path.abspath(INCOMING_DIR).lower()
+        if rec and rec["status"] == "failed" and is_in_incoming:
+            logging.info(f"Файл {filename} был вручную возвращен в incoming/. Сбрасываем счетчик попыток с {rec['retry_count']} на 0.")
+            try:
+                conn_reset = psycopg2.connect(**DB_CONFIG)
+                cur_reset = conn_reset.cursor()
+                cur_reset.execute("""
+                    UPDATE call_transcriptions
+                    SET status = 'pending', retry_count = 0, last_error = NULL
+                    WHERE unique_id = %s OR source_file = %s;
+                """, (unique_id, filename))
+                conn_reset.commit()
+                cur_reset.close()
+                conn_reset.close()
+                rec["status"] = "pending"
+                rec["retry_count"] = 0
+            except Exception as e:
+                logging.warning(f"Не удалось сбросить статус попыток в БД для {filename}: {e}")
 
         if rec and rec["status"] == "failed" and rec["retry_count"] >= MAX_RETRIES:
             logging.warning(f"Файл {filename} ранее превысил лимит попыток ({rec['retry_count']}/{MAX_RETRIES}). Перемещаем в error/.")

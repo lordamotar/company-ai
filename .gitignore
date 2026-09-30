@@ -31,3 +31,10 @@ frontend/*.json
 html/*.json
 call/
 datalens/
+
+# Системный промпт AI-анализа — часть проекта, в git должен попадать
+!prompts/
+!prompts/*.md
+
+# Кэш AI-отчётов по менеджерам
+app/cache/

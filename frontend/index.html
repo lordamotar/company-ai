@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css?v=3.0">
+    <link rel="stylesheet" href="manager_analysis.css?v=1.1">
 </head>
 <body>
     <div class="app-container">
@@ -45,6 +46,10 @@
                 <a href="#managers" class="nav-item" data-view="view-managers" data-title="Менеджеры">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                     <span>Менеджеры</span>
+                </a>
+                <a href="#mgr-analysis" class="nav-item" data-view="view-mgr-analysis" data-title="Анализ менеджеров">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><polyline points="8 12 10.5 9.5 12.5 11.5 15 8.5"></polyline></svg>
+                    <span>Анализ менеджеров</span>
                 </a>
                 <a href="#clients" class="nav-item" data-view="view-clients" data-title="Клиенты">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
@@ -324,6 +329,32 @@
                         <button class="page-btn page-nav" id="managersPageLast" title="Последняя страница">»</button>
                     </div>
                 </div>
+            </div>
+
+            <!-- ЭКРАН 3.1: ДЕТАЛЬНЫЙ АНАЛИЗ МЕНЕДЖЕРОВ ЗА ПЕРИОД -->
+            <div id="view-mgr-analysis" class="page-view">
+                <div class="card ma-filters">
+                    <div class="ma-filter-field">
+                        <label for="maManagerSelect">Менеджер</label>
+                        <select id="maManagerSelect" class="filter-select"></select>
+                    </div>
+                    <div class="ma-filter-field">
+                        <label for="maDateFrom">С</label>
+                        <input type="date" id="maDateFrom" class="filter-select">
+                    </div>
+                    <div class="ma-filter-field">
+                        <label for="maDateTo">По</label>
+                        <input type="date" id="maDateTo" class="filter-select">
+                    </div>
+                    <div class="ma-presets">
+                        <button class="btn btn-secondary" data-ma-preset="7d">7 дней</button>
+                        <button class="btn btn-secondary" data-ma-preset="30d">30 дней</button>
+                        <button class="btn btn-secondary" data-ma-preset="month">Этот месяц</button>
+                        <button class="btn btn-secondary" data-ma-preset="prev-month">Прошлый месяц</button>
+                        <button class="btn btn-secondary" data-ma-preset="all">Весь период</button>
+                    </div>
+                </div>
+                <div id="maResult"></div>
             </div>
 
             <!-- ЭКРАН 4: КЛИЕНТЫ И ИСТОРИЯ ОБРАЩЕНИЙ -->
@@ -1296,6 +1327,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=4.0"></script>
+    <script src="app.js?v=4.1"></script>
+    <script src="manager_analysis.js?v=1.2"></script>
 </body>
 </html>

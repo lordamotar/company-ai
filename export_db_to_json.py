@@ -5,6 +5,11 @@ import logging
 import re
 from datetime import date, time, datetime
 
+try:
+    from app.services import asr_guard as _asr_guard
+except ImportError:  # запуск вне корня проекта
+    _asr_guard = None
+
 DB_CONFIG = {
     "host": os.getenv("DB_HOST", "127.0.0.1"),
     "port": int(os.getenv("DB_PORT", "5433")),
@@ -146,14 +151,21 @@ def export_audit_logs_to_json(output_file=DEFAULT_AUDIT_JSON, write_to_file=True
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
 
+        # Гарантируем наличие колонки unique_id в call_audit_logs
+        try:
+            cursor.execute("ALTER TABLE call_audit_logs ADD COLUMN IF NOT EXISTS unique_id VARCHAR(64);")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+
         cursor.execute("""
             SELECT 
                 l.id, l.call_id, l.field_name, l.old_value, l.new_value, 
                 l.changed_by, l.changed_at, l.comment,
                 t.phone, t.call_date, t.call_time, t.manager_name,
-                COALESCE(l.unique_id, t.unique_id) as unique_id
+                t.unique_id as unique_id
             FROM call_audit_logs l
-            LEFT JOIN call_transcriptions t ON (l.unique_id IS NOT NULL AND l.unique_id = t.unique_id) OR (l.call_id = t.id)
+            LEFT JOIN call_transcriptions t ON (l.call_id = t.id)
             ORDER BY l.id DESC;
         """)
         rows = cursor.fetchall()
@@ -454,6 +466,14 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 script_score = int((sum(1 for i in applicable_items if i["passed"]) / len(applicable_items)) * 100)
             else:
                 script_score = 100
+
+            # Единая логика приветствия: ошибки распознавания имени/компании не считаются ошибкой менеджера
+            # (тот же расчёт использует вкладка «Анализ менеджеров»)
+            if _asr_guard:
+                _norm_call = _asr_guard.normalize_call({"dialogue": dialogue, "checklist": checklist, "callSummary": db_call_summary})
+                if _norm_call["checklist"] is not checklist:
+                    checklist = _norm_call["checklist"]
+                    script_score = _asr_guard.script_score(checklist)
 
             mgr_lines = [d for d in dialogue if d.get("role") == "manager"]
             client_lines = [d for d in dialogue if d.get("role") == "client"]

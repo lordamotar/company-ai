@@ -48,7 +48,10 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: company-web
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "8080:8080"
     environment:
@@ -64,9 +67,11 @@ services:
       - ./app:/app/app
       - ./export_db_to_json.py:/app/export_db_to_json.py
       - ./frontend:/app/frontend
+      - ./prompts:/app/prompts
       - ./incoming:/app/incoming
       - ./processed:/app/processed
       - ./processing:/app/processing
       - ./.tech:/app/.tech
+      - ./.env:/app/.env:ro
     depends_on:
       - postgres

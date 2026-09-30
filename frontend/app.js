@@ -619,6 +619,9 @@ function renderManagers(data, keepPage = false) {
                 <button class="btn-filter-manager" onclick="filterByManager('${m.name}')">
                     📞 Звонки (${count})
                 </button>
+                <button class="btn-filter-manager" onclick="openManagerAnalysisFor('${m.name}')" title="Детальный анализ за период с AI-разбором">
+                    🔎 За период
+                </button>
             </div>
         `;
         grid.appendChild(card);
@@ -686,8 +689,9 @@ function openManagerAnalytics(managerName) {
     let lostUpsellCalls = 0;
     mgrCalls.forEach(c => {
         if (c.checklist) {
-            const up = c.checklist.find(item => item.title && item.title.toLowerCase().includes("допродаж"));
-            if (up && !up.passed) lostUpsellCalls++;
+            const up = c.checklist.find(item => item.title && item.title.toLowerCase().includes("доп"));
+            const na = up && (up.not_applicable || up.status === "not_applicable" || up.passed === null);
+            if (up && !na && up.passed !== true && up.status !== "passed") lostUpsellCalls++;
         }
     });
     const lostSalesSum = lostUpsellCalls * 18000;
@@ -709,231 +713,148 @@ function openManagerAnalytics(managerName) {
     document.getElementById("mgrKpiLostSub").innerText = lostUpsellCalls > 0 ? `Не предложено в ${lostUpsellCalls} звонк.` : "Все услуги предложены";
     document.getElementById("mgrModalCallsTabCount").innerText = count;
 
-    // 1. Сильные стороны
-    const strengthsList = document.getElementById("mgrStrengthsList");
-    strengthsList.innerHTML = `
-        <div class="mgr-audit-item">
-            <span class="mgr-audit-item-icon" style="color: #4ade80;">✓</span>
-            <div>
-                <div class="mgr-audit-item-title">Идеальное соблюдение корпоративного приветствия</div>
-                <div class="mgr-audit-item-desc">В 100% звонков четко называет компанию «Эйкос» и свое имя, формируя доверительный контакт с первых секунд.</div>
-            </div>
-        </div>
-        <div class="mgr-audit-item">
-            <span class="mgr-audit-item-icon" style="color: #4ade80;">✓</span>
-            <div>
-                <div class="mgr-audit-item-title">Высокая экспертность и точность подбора типоразмеров</div>
-                <div class="mgr-audit-item-desc">Безошибочно ориентируется в индексах нагрузки/скорости и взаимозаменяемости шин (Mercedes, Toyota и др.).</div>
-            </div>
-        </div>
-        <div class="mgr-audit-item">
-            <span class="mgr-audit-item-icon" style="color: #4ade80;">✓</span>
-            <div>
-                <div class="mgr-audit-item-title">Позитивный Tone of Voice и стрессоустойчивость</div>
-                <div class="mgr-audit-item-desc">Средний индекс удовлетворенности ${avgCsat} / 5.0. Спокойный, уверенный тон без конфликтов и перебиваний клиента.</div>
-            </div>
-        </div>
-    `;
+    // ------------------------------------------------------------------
+    // Все блоки ниже считаются по реальным звонкам (раньше здесь был статичный текст)
+    // ------------------------------------------------------------------
+    const escHtml = (v) => String(v === null || v === undefined ? "" : v)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const isNaItem = (i) => i.not_applicable || i.status === "not_applicable";
+    const isPassItem = (i) => i.passed === true || i.status === "passed";
 
-    // 2. Зоны роста и ошибки
-    const weaknessesList = document.getElementById("mgrWeaknessesList");
-    weaknessesList.innerHTML = `
+    // Выполнение этапов скрипта: процент только по звонкам, где этап применим
+    const aggregateStages = (calls) => {
+        const agg = {};
+        calls.forEach(c => (c.checklist || []).forEach(item => {
+            const t = item.title || "Критерий";
+            const st = agg[t] || (agg[t] = { title: t, applicable: 0, passed: 0, failed: 0, failedCalls: [] });
+            if (isNaItem(item)) return;
+            st.applicable++;
+            if (isPassItem(item)) st.passed++;
+            else { st.failed++; st.failedCalls.push(c.id); }
+        }));
+        Object.values(agg).forEach(st => { st.pct = st.applicable ? Math.round(st.passed * 100 / st.applicable) : null; });
+        return agg;
+    };
+    const mgrStages = aggregateStages(mgrCalls);
+    const teamStages = aggregateStages(callsData);
+    const stageRows = Object.values(mgrStages).filter(st => st.applicable > 0);
+    const teamPctText = (title) => {
+        const t = teamStages[title];
+        return t && t.pct !== null ? ` (команда: ${t.pct}%)` : "";
+    };
+    const auditItem = (icon, color, title, desc) => `
         <div class="mgr-audit-item">
-            <span class="mgr-audit-item-icon" style="color: #f87171;">⚠️</span>
+            <span class="mgr-audit-item-icon" style="color: ${color};">${icon}</span>
             <div>
-                <div class="mgr-audit-item-title">Систематический пропуск допродажи сезонного хранения шин</div>
-                <div class="mgr-audit-item-desc">В ${lostUpsellCalls > 0 ? Math.round((lostUpsellCalls/count)*100) : 50}% диалогов менеджер завершает консультацию без предложения сезонного отеля шин и шиномонтажа.</div>
+                <div class="mgr-audit-item-title">${escHtml(title)}</div>
+                <div class="mgr-audit-item-desc">${desc}</div>
             </div>
-        </div>
-        <div class="mgr-audit-item">
-            <span class="mgr-audit-item-icon" style="color: #facc15;">⏱️</span>
-            <div>
-                <div class="mgr-audit-item-title">Паузы при проверке складских остатков</div>
-                <div class="mgr-audit-item-desc">В моменты проверки цен в учетной системе тишина на линии достигает 25–40 секунд без удержания внимания клиента.</div>
-            </div>
-        </div>
-        <div class="mgr-audit-item">
-            <span class="mgr-audit-item-icon" style="color: #facc15;">🎯</span>
-            <div>
-                <div class="mgr-audit-item-title">Отсутствие попытки закрытия на бронь/визит</div>
-                <div class="mgr-audit-item-desc">Консультация завершается фразой «приезжайте, смотрите» вместо активного предложения забронировать комплект на филиале.</div>
-            </div>
-        </div>
-    `;
+        </div>`;
+    const callLinks = (ids) => ids.slice(0, 8).map(id => `<a href="javascript:void(0)" onclick="closeManagerModal(); openCallModal(${Number(id)});" style="color: var(--accent-blue); font-weight: 600;">#${Number(id)}</a>`).join(" ") + (ids.length > 8 ? " …" : "");
 
-    // 3. Рекомендации РОПу
+    // 1. Сильные стороны — этапы скрипта, выполняемые стабильно
+    const strengths = stageRows.filter(st => st.pct >= 90 && st.applicable >= 3)
+        .sort((x, y) => y.pct - x.pct).slice(0, 4)
+        .map(st => auditItem("✓", "#4ade80", `${st.title}: ${st.pct}%`,
+            `Выполнено в ${st.passed} из ${st.applicable} звонков, где этап применим${teamPctText(st.title)}.`));
+    if (avgCsat !== "—" && parseFloat(avgCsat) >= 4.5) {
+        strengths.push(auditItem("✓", "#4ade80", `Высокая удовлетворённость клиентов: ${avgCsat} / 5.0`, "Средний CSAT по оценке нейросети."));
+    }
+    document.getElementById("mgrStrengthsList").innerHTML = strengths.length
+        ? strengths.join("")
+        : `<div class="mgr-audit-item-desc">Пока нет устойчиво выполняемых этапов — недостаточно звонков для выводов.</div>`;
+
+    // 2. Точки роста — этапы с низким выполнением и реальные конфликты
+    const weaknesses = stageRows.filter(st => st.failed > 0 && (st.pct < 80 || st.failed >= 3))
+        .sort((x, y) => x.pct - y.pct).slice(0, 4)
+        .map(st => auditItem(st.pct < 50 ? "⚠️" : "⏱️", st.pct < 50 ? "#f87171" : "#facc15",
+            `${st.title}: ${st.pct}%`,
+            `Не выполнено в ${st.failed} из ${st.applicable} звонков${teamPctText(st.title)}. Звонки: ${callLinks(st.failedCalls)}`));
+    const conflictCalls = mgrCalls.filter(c => c.conflict).map(c => c.id);
+    if (conflictCalls.length) {
+        weaknesses.push(auditItem("🔥", "#f87171", `Конфликты с клиентами: ${conflictCalls.length}`, `Звонки: ${callLinks(conflictCalls)}`));
+    }
+    document.getElementById("mgrWeaknessesList").innerHTML = weaknesses.length
+        ? weaknesses.join("")
+        : `<div class="mgr-audit-item-desc">Существенных отклонений по этапам скрипта не выявлено.</div>`;
+
+    // 3. Рекомендации — персональный AI-разбор вынесен на отдельную вкладку (с цитатами из звонков)
     const ropRecs = document.getElementById("mgrRopRecommendations");
     ropRecs.innerHTML = `
         <div class="mgr-rop-tip-item">
-            <div class="mgr-rop-tip-num">1</div>
+            <div class="mgr-rop-tip-num">🔎</div>
             <div>
-                <strong style="color: #fff; font-size: 13px; display: block; margin-bottom: 2px;">Внедрить обязательный речевой модуль допродажи услуг</strong>
-                <span style="font-size: 12px; color: var(--text-secondary);">Обязать менеджера озвучивать фразу: «При покупке комплекта у нас действует акция: сезонное хранение и шиномонтаж без очереди — забронировать для вас время?».</span>
+                <strong style="color: #fff; font-size: 13px; display: block; margin-bottom: 2px;">Персональный разбор с цитатами из звонков</strong>
+                <span style="font-size: 12px; color: var(--text-secondary);">Слабые места, упущенные возможности и план работы формируются на вкладке «Анализ менеджеров» за выбранный период — на основе реальных диалогов, а не шаблонов.</span>
+                <div style="margin-top: 10px;"><button class="btn btn-primary" id="mgrOpenDetailedBtn">Открыть детальный анализ</button></div>
             </div>
-        </div>
-        <div class="mgr-rop-tip-item">
-            <div class="mgr-rop-tip-num">2</div>
-            <div>
-                <strong style="color: #fff; font-size: 13px; display: block; margin-bottom: 2px;">Сократить паузы поиска в 1С / Битрикс</strong>
-                <span style="font-size: 12px; color: var(--text-secondary);">Научить комментировать свои действия («Секунду, открываю остатки склада в Алматы...») для исключения ощущения повисшей паузы.</span>
-            </div>
-        </div>
-        <div class="mgr-rop-tip-item">
-            <div class="mgr-rop-tip-num">3</div>
-            <div>
-                <strong style="color: #fff; font-size: 13px; display: block; margin-bottom: 2px;">Провести тренинг по дожиму сделки на визит в шинный центр</strong>
-                <span style="font-size: 12px; color: var(--text-secondary);">Фиксировать клиента на конкретное время визита с резервированием товара по номеру телефона.</span>
-            </div>
-        </div>
-    `;
+        </div>`;
+    const detailedBtn = document.getElementById("mgrOpenDetailedBtn");
+    if (detailedBtn) detailedBtn.onclick = () => { closeManagerModal(); openManagerAnalysisFor(managerName); };
 
-    // 4. Декомпозиция этапов скрипта (7 показателей)
-    const stagesList = document.getElementById("mgrScriptStagesList");
-    let greetPass = 0, needsPass = 0, presentPass = 0, objectionPass = 0, closingPass = 0, profPass = 0, upsellPass = 0;
-    mgrCalls.forEach(c => {
-        if (c.checklist) {
-            c.checklist.forEach(item => {
-                const t = (item.title || "").toLowerCase();
-                if (t.includes("приветств") && item.passed) greetPass++;
-                if (t.includes("потребност") && item.passed) needsPass++;
-                if (t.includes("презентац") && item.passed) presentPass++;
-                if (t.includes("возражен") && item.passed) objectionPass++;
-                if ((t.includes("окончан") || t.includes("заверш")) && item.passed) closingPass++;
-                if ((t.includes("профессиональн") || t.includes("подход")) && item.passed) profPass++;
-                if ((t.includes("доп") || t.includes("продаж")) && item.passed) upsellPass++;
-            });
-        }
-    });
+    // 4. Этапы скрипта: процент по применимым звонкам
+    const stagesMeta = [
+        { key: "приветств", name: "1. Приветствие", desc: "Поздоровался и представился", cls: "green", color: "#4ade80" },
+        { key: "потребност", name: "2. Выявление потребностей", desc: "Уточнил типоразмер шин, сезонность и параметры авто", cls: "green", color: "#4ade80" },
+        { key: "презентац", name: "3. Презентация", desc: "Презентовал варианты шин, озвучил бренды, наличие и цены", cls: "blue", color: "#60a5fa" },
+        { key: "возражен", name: "4. Работа с возражениями", desc: "Отработал вопросы по наличию, складу, предложил альтернативы", cls: "yellow", color: "#facc15" },
+        { key: "окончан", name: "5. Окончание разговора", desc: "Зафиксировал договорённость, назвал адрес/филиал, вежливо попрощался", cls: "green", color: "#4ade80" },
+        { key: "профессиональн", name: "6. Профессиональный подход", desc: "Стандарты вежливости, экспертность и деловой этикет", cls: "blue", color: "#60a5fa" },
+        { key: "доп", name: "7. Допродажа", desc: "Предложение сезонного хранения шин, шиномонтажа и гарантии", cls: "purple", color: "#c084fc" }
+    ];
+    document.getElementById("mgrScriptStagesList").innerHTML = stagesMeta.map(meta => {
+        const st = Object.values(mgrStages).find(x => x.title.toLowerCase().includes(meta.key));
+        const pct = st && st.pct !== null ? st.pct : null;
+        const note = st ? ` • применим в ${st.applicable} из ${count} зв.${teamPctText(st.title)}` : "";
+        return `
+        <div class="script-stage-row">
+            <div class="script-stage-info">
+                <div class="script-stage-name">${meta.name}</div>
+                <div class="script-stage-desc">${meta.desc}${note}</div>
+            </div>
+            <div class="script-stage-progress-wrap">
+                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill ${meta.cls}" style="width: ${pct || 0}%;"></div></div>
+                <strong style="color: ${meta.color}; font-size: 13px;">${pct === null ? "н/п" : pct + "%"}</strong>
+            </div>
+        </div>`;
+    }).join("");
 
-    const greetPct = Math.round((greetPass / count) * 100);
-    const needsPct = Math.round((needsPass / count) * 100);
-    const presentPct = Math.round((presentPass / count) * 100);
-    const objectionPct = Math.round((objectionPass / count) * 100);
-    const closingPct = Math.round((closingPass / count) * 100);
-    const profPct = Math.round((profPass / count) * 100);
-    const upsellPct = Math.round((upsellPass / count) * 100);
-
-    stagesList.innerHTML = `
-        <div class="script-stage-row">
-            <div class="script-stage-info">
-                <div class="script-stage-name">1. Приветствие</div>
-                <div class="script-stage-desc">Назвал компанию «Эйкос» и представился по имени</div>
-            </div>
-            <div class="script-stage-progress-wrap">
-                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill green" style="width: ${greetPct}%;"></div></div>
-                <strong style="color: #4ade80; font-size: 13px;">${greetPct}%</strong>
-            </div>
-        </div>
-        <div class="script-stage-row">
-            <div class="script-stage-info">
-                <div class="script-stage-name">2. Выявления потребностей</div>
-                <div class="script-stage-desc">Уточнил типоразмер шин, сезонность и параметры авто</div>
-            </div>
-            <div class="script-stage-progress-wrap">
-                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill green" style="width: ${needsPct}%;"></div></div>
-                <strong style="color: #4ade80; font-size: 13px;">${needsPct}%</strong>
-            </div>
-        </div>
-        <div class="script-stage-row">
-            <div class="script-stage-info">
-                <div class="script-stage-name">3. Презентация</div>
-                <div class="script-stage-desc">Презентовал варианты шин, озвучил бренды, наличие и цены</div>
-            </div>
-            <div class="script-stage-progress-wrap">
-                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill blue" style="width: ${presentPct}%;"></div></div>
-                <strong style="color: #60a5fa; font-size: 13px;">${presentPct}%</strong>
-            </div>
-        </div>
-        <div class="script-stage-row">
-            <div class="script-stage-info">
-                <div class="script-stage-name">4. Работа с возражениями</div>
-                <div class="script-stage-desc">Отработал вопросы по наличию, складу, предложил альтернативы</div>
-            </div>
-            <div class="script-stage-progress-wrap">
-                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill yellow" style="width: ${objectionPct}%;"></div></div>
-                <strong style="color: #facc15; font-size: 13px;">${objectionPct}%</strong>
-            </div>
-        </div>
-        <div class="script-stage-row">
-            <div class="script-stage-info">
-                <div class="script-stage-name">5. Окончание разговора</div>
-                <div class="script-stage-desc">Зафиксировал договоренность, назвал адрес/филиал, вежливо попрощался</div>
-            </div>
-            <div class="script-stage-progress-wrap">
-                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill green" style="width: ${closingPct}%;"></div></div>
-                <strong style="color: #4ade80; font-size: 13px;">${closingPct}%</strong>
-            </div>
-        </div>
-        <div class="script-stage-row">
-            <div class="script-stage-info">
-                <div class="script-stage-name">6. Профессиональный подход</div>
-                <div class="script-stage-desc">Соблюдение стандартов вежливости, экспертность и деловой этикет</div>
-            </div>
-            <div class="script-stage-progress-wrap">
-                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill blue" style="width: ${profPct}%;"></div></div>
-                <strong style="color: #60a5fa; font-size: 13px;">${profPct}%</strong>
-            </div>
-        </div>
-        <div class="script-stage-row">
-            <div class="script-stage-info">
-                <div class="script-stage-name">7. Доп прдажа</div>
-                <div class="script-stage-desc">Предложение сезонного хранения шин, шиномонтажа и гарантии</div>
-            </div>
-            <div class="script-stage-progress-wrap">
-                <div class="script-bar-track" style="flex: 1;"><div class="script-bar-fill purple" style="width: ${upsellPct}%;"></div></div>
-                <strong style="color: #c084fc; font-size: 13px;">${upsellPct}%</strong>
-            </div>
-        </div>
-    `;
-
-    // 5. Tone of Voice и Акустика
-    let happySum = 0, neutralSum = 0, sadSum = 0, angrySum = 0;
-    mgrCalls.forEach(c => {
-        const d = c.emotionsDist || {};
-        happySum += Number(d.happy) || 60;
-        neutralSum += Number(d.neutral) || 30;
-        sadSum += Number(d.sad) || 5;
-        angrySum += Number(d.angry) || 0;
-    });
-    const happyAvg = (happySum / count).toFixed(1);
-    const neutralAvg = (neutralSum / count).toFixed(1);
-    const sadAvg = (sadSum / count).toFixed(1);
-    const angryAvg = (angrySum / count).toFixed(1);
-
-    document.getElementById("mgrToneBarsList").innerHTML = `
+    // 5. Tone of Voice и акустика — средние по реальным данным звонков, без подстановки значений по умолчанию
+    const avgOf = (vals) => vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    const toneVals = (key) => mgrCalls.filter(c => c.emotionsDist && c.emotionsDist[key] !== undefined && c.emotionsDist[key] !== null)
+        .map(c => Number(c.emotionsDist[key]) || 0);
+    const toneAvg = (key) => { const v = avgOf(toneVals(key)); return v === null ? null : v.toFixed(1); };
+    const toneBar = (icon, label, val, cls, extraStyle) => `
         <div class="script-bar-item">
-            <div class="script-bar-meta"><span>😊 Радость / Дружелюбие</span><span>${happyAvg}%</span></div>
-            <div class="script-bar-track"><div class="script-bar-fill green" style="width: ${happyAvg}%;"></div></div>
-        </div>
-        <div class="script-bar-item">
-            <div class="script-bar-meta"><span>😐 Нейтральный деловой тон</span><span>${neutralAvg}%</span></div>
-            <div class="script-bar-track"><div class="script-bar-fill blue" style="width: ${neutralAvg}%;"></div></div>
-        </div>
-        <div class="script-bar-item">
-            <div class="script-bar-meta"><span>🙁 Сомнения / Неуверенность</span><span>${sadAvg}%</span></div>
-            <div class="script-bar-track"><div class="script-bar-fill yellow" style="width: ${sadAvg}%;"></div></div>
-        </div>
-        <div class="script-bar-item">
-            <div class="script-bar-meta"><span>😠 Раздражение / Конфликт</span><span>${angryAvg}%</span></div>
-            <div class="script-bar-track"><div class="script-bar-fill" style="background: #ef4444; width: ${angryAvg}%;"></div></div>
-        </div>
-    `;
+            <div class="script-bar-meta"><span>${icon} ${label}</span><span>${val === null ? "нет данных" : val + "%"}</span></div>
+            <div class="script-bar-track"><div class="script-bar-fill ${cls}" style="${extraStyle || ""} width: ${val || 0}%;"></div></div>
+        </div>`;
+    document.getElementById("mgrToneBarsList").innerHTML =
+        toneBar("😊", "Радость / Дружелюбие", toneAvg("happy"), "green") +
+        toneBar("😐", "Нейтральный деловой тон", toneAvg("neutral"), "blue") +
+        toneBar("🙁", "Сомнения / Неуверенность", toneAvg("sad"), "yellow") +
+        toneBar("😠", "Раздражение / Конфликт", toneAvg("angry"), "", "background: #ef4444;");
 
+    const numFrom = (text, rx) => { const m = String(text || "").match(rx); return m ? parseFloat(m[1]) : null; };
+    const tempoAvg = avgOf(mgrCalls.map(c => numFrom((c.acoustics || {}).tempo, /(\d+(?:\.\d+)?)/)).filter(v => v !== null));
+    const silenceAvg = avgOf(mgrCalls.map(c => numFrom((c.acoustics || {}).silence, /\((\d+(?:\.\d+)?)\s*%\)/)).filter(v => v !== null));
+    const loudAvg = avgOf(mgrCalls.map(c => numFrom((c.acoustics || {}).loudMoments, /(\d+(?:\.\d+)?)/)).filter(v => v !== null));
+    const tempoNote = tempoAvg === null ? "нет данных" : `${Math.round(tempoAvg)} слов/мин` + (tempoAvg < 90 ? " (медленный темп)" : tempoAvg > 170 ? " (быстрый темп)" : " (комфортный темп)");
     document.getElementById("mgrAcousticsList").innerHTML = `
         <div class="acoustic-metric">
-            <span class="metric-title">Темп речи менеджера:</span>
-            <span class="metric-val">132.5 уд/мин (Оптимальный темп)</span>
-            <div class="metric-bar"><div class="fill purple" style="width: 65%;"></div></div>
+            <span class="metric-title">Темп речи (весь диалог):</span>
+            <span class="metric-val">${tempoNote}</span>
+            <div class="metric-bar"><div class="fill purple" style="width: ${tempoAvg === null ? 0 : Math.min(100, Math.round(tempoAvg / 2))}%;"></div></div>
         </div>
         <div class="acoustic-metric">
-            <span class="metric-title">Баланс активной речи / пауз:</span>
-            <span class="metric-val">68% речь • 32% паузы</span>
-            <div class="metric-bar"><div class="fill green" style="width: 68%;"></div></div>
+            <span class="metric-title">Баланс речи / пауз:</span>
+            <span class="metric-val">${silenceAvg === null ? "нет данных" : `${Math.round(100 - silenceAvg)}% речь • ${Math.round(silenceAvg)}% паузы`}</span>
+            <div class="metric-bar"><div class="fill green" style="width: ${silenceAvg === null ? 0 : Math.round(100 - silenceAvg)}%;"></div></div>
         </div>
         <div class="acoustic-metric">
-            <span class="metric-title">Резкие всплески / Крики:</span>
-            <span class="metric-val">0% (Спокойный диалог)</span>
-            <div class="metric-bar"><div class="fill green" style="width: 2%;"></div></div>
+            <span class="metric-title">Громкие моменты:</span>
+            <span class="metric-val">${loudAvg === null ? "нет данных" : `${Math.round(loudAvg)}% времени`}</span>
+            <div class="metric-bar"><div class="fill green" style="width: ${loudAvg === null ? 0 : Math.min(100, Math.round(loudAvg))}%;"></div></div>
         </div>
     `;
 
@@ -1475,6 +1396,10 @@ function switchView(viewId) {
         if (heading) heading.innerText = "Рейтинг и эффективность менеджеров";
         if (subheading) subheading.innerText = "Показатели CSAT, соблюдения скриптов и тональности по каждому сотруднику";
         renderManagers(callsData, true);
+    } else if (viewId === "view-mgr-analysis") {
+        if (heading) heading.innerText = "Детальный анализ менеджеров";
+        if (subheading) subheading.innerText = "Разбор работы сотрудника за выбранный период: слабые места, нарушения скрипта, AI-рекомендации";
+        if (typeof window.initManagerAnalysis === "function") window.initManagerAnalysis();
     } else if (viewId === "view-clients") {
         if (heading) heading.innerText = "Клиентская база и история обращений";
         if (subheading) subheading.innerText = "История звонков каждого клиента, вопросы, потребности и AI-профилирование";
