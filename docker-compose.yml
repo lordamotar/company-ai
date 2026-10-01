@@ -63,9 +63,13 @@ services:
       - DB_USER=company_user
       - DB_PASSWORD=company_password
       - TZ=Asia/Almaty
+      # На Windows Docker не получает события изменения файлов — без опроса --reload не видит правки кода
+      - WATCHFILES_FORCE_POLLING=true
     volumes:
       - ./app:/app/app
       - ./export_db_to_json.py:/app/export_db_to_json.py
+      - ./call_categories.py:/app/call_categories.py
+      - ./tire_sizes.py:/app/tire_sizes.py
       - ./frontend:/app/frontend
       - ./prompts:/app/prompts
       - ./incoming:/app/incoming

@@ -97,8 +97,9 @@ def detect_tire_details(text):
     found_brands = [b for b in brands if b.lower() in text_str.lower()]
     brand_str = " / ".join(found_brands) if found_brands else None
 
-    m_size = re.search(r'(\d{3}[\s/]\d{2}[\s/R]*\d{2})', text_str, re.I)
-    tire_size = m_size.group(1).replace(" ", "/").upper() if m_size else None
+    # Только физически возможные размеры: продиктованные телефоны и номера заказов («707 512 03 06») отбрасываются
+    from tire_sizes import find_tire_size_in_text
+    tire_size = find_tire_size_in_text(text_str)
 
     return brand_str, tire_size
 
@@ -391,7 +392,8 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             city_name = db_city if db_city else detect_city(raw_text)
             det_brand, det_size = detect_tire_details(raw_text)
             brand_name = db_tire_brand or det_brand
-            tire_size_str = db_tire_size or det_size
+            from tire_sizes import normalize_tire_size
+            tire_size_str = normalize_tire_size(db_tire_size) or det_size
             topic_str = f"{brand_name} {tire_size_str}" if brand_name else "Консультация по шинам"
             client_name = db_client_name or (f"Клиент (+..{phone[-4:]})" if phone and len(phone) >= 4 else "Клиент")
 
@@ -609,17 +611,18 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 "checklist": checklist
             })
 
-            # Синхронизируем разметку обратно в PostgreSQL для сохранности
+            # Синхронизируем разметку обратно в PostgreSQL для сохранности.
+            # Типоразмер, найденный поиском по тексту, в БД НЕ записывается: это догадка, а не ответ модели
+            # (раньше так в базу попадали продиктованные номера телефонов — см. tire_sizes.py).
             try:
                 cursor.execute("""
                     UPDATE call_transcriptions
                     SET call_category = COALESCE(call_category, %s),
                         call_subcategory = COALESCE(call_subcategory, %s),
                         call_tags = COALESCE(call_tags, %s),
-                        tire_brand = COALESCE(NULLIF(tire_brand, ''), %s),
-                        tire_size = COALESCE(NULLIF(tire_size, ''), %s)
+                        tire_brand = COALESCE(NULLIF(tire_brand, ''), %s)
                     WHERE id = %s;
-                """, (call_category, call_subcategory, json.dumps(call_tags, ensure_ascii=False), det_brand, det_size, call_id))
+                """, (call_category, call_subcategory, json.dumps(call_tags, ensure_ascii=False), det_brand, call_id))
             except Exception:
                 pass
 
