@@ -961,8 +961,9 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
         payment_method = comm.get("payment_method")
         lost_reason = comm.get("lost_reason")
         call_summary = comm.get("call_summary") or summary
-        call_category = comm.get("call_category", "Подбор и бронь шин")
-        call_subcategory = comm.get("call_subcategory", "Заказ и бронирование")
+        # Категория приводится к единому справочнику (call_categories.py)
+        from call_categories import normalize_category
+        call_category, call_subcategory = normalize_category(comm.get("call_category"), comm.get("call_subcategory"))
         call_tags = comm.get("call_tags", [])
         city_name = comm.get("city_name")
 

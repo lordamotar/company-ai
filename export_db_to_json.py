@@ -371,6 +371,9 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             # Если классификация еще не установлена в БД, высчитываем ее
             if not db_category or db_category == 'Прочее / Консультация':
                 det_cat, det_subcat, det_tags = detect_call_classification(raw_text, sale_status, service_booking, conflict, has_upsell)
+                # Старые названия эвристики приводим к единому справочнику категорий
+                from call_categories import normalize_category
+                det_cat, det_subcat = normalize_category(det_cat, det_subcat)
                 call_category = db_category or det_cat
                 call_subcategory = db_subcategory or det_subcat
                 call_tags = db_tags if db_tags else det_tags
@@ -378,6 +381,11 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 call_category = db_category
                 call_subcategory = db_subcategory or "Общие вопросы"
                 call_tags = db_tags if isinstance(db_tags, list) else []
+
+            # Отображение — всегда в терминах единого справочника (старые названия приводятся к новым)
+            from call_categories import normalize_category
+            call_category, _norm_sub = normalize_category(call_category, call_subcategory)
+            call_subcategory = _norm_sub or call_subcategory
 
             manager_name = db_manager if db_manager else detect_manager_name(raw_text)
             city_name = db_city if db_city else detect_city(raw_text)

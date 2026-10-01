@@ -254,21 +254,20 @@ function renderCallsTable(data, keepPage = false) {
                 serviceBadge = `<span class="badge badge-success" style="font-size: 10px; padding: 2.5px 7px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); font-weight: 600;" title="Запись на сервис: ${call.serviceBooking}${call.serviceDate ? ' на ' + call.serviceDate : ''}">🟢 Сервис: ${call.serviceBooking}</span>`;
             }
 
-            let categoryBadge = "";
-            const cat = call.callCategory || "Прочее / Консультация";
-            if (cat === "Запись на шиномонтаж") {
-                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); font-weight: 600;">🛠️ ${cat}</span>`;
-            } else if (cat === "Подбор и бронь шин") {
-                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); font-weight: 600;">🛒 ${cat}</span>`;
-            } else if (cat === "Инфо: Адрес / Время") {
-                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.4); font-weight: 500;">📍 ${cat}</span>`;
-            } else if (cat === "Статус заказа") {
-                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4); font-weight: 600;">📦 ${cat}</span>`;
-            } else if (cat === "Рекламация / Претензия") {
-                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-weight: 600;">⚠️ ${cat}</span>`;
-            } else {
-                categoryBadge = `<span class="badge" style="font-size: 10.5px; padding: 3px 8px; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); font-weight: 500;">💬 ${cat}</span>`;
-            }
+            // Цвета категорий — по единому справочнику call_categories.py
+            const CATEGORY_STYLES = {
+                "Подбор и покупка":     ["🛒", "56, 189, 248", "#38bdf8"],
+                "Уточнение по товару":  ["🔎", "99, 102, 241", "#a5b4fc"],
+                "Заказы и брони":       ["📦", "251, 191, 36", "#fbbf24"],
+                "Сервис":               ["🛠️", "16, 185, 129", "#34d399"],
+                "Справка":              ["📍", "148, 163, 184", "#cbd5e1"],
+                "Жалоба":               ["⚠️", "239, 68, 68", "#f87171"],
+                "Не клиентский звонок": ["🏢", "100, 116, 139", "#94a3b8"],
+            };
+            const cat = call.callCategory || "Прочее";
+            const [catIcon, catRgb, catColor] = CATEGORY_STYLES[cat] || ["💬", "168, 85, 247", "#c084fc"];
+            const catTitle = call.callSubcategory ? ` title="${call.callSubcategory}"` : "";
+            const categoryBadge = `<span class="badge"${catTitle} style="font-size: 10.5px; padding: 3px 8px; background: rgba(${catRgb}, 0.15); color: ${catColor}; border: 1px solid rgba(${catRgb}, 0.4); font-weight: 600;">${catIcon} ${cat}</span>`;
 
             let tagsBadges = "";
             if (Array.isArray(call.callTags) && call.callTags.length > 0) {
@@ -1495,7 +1494,7 @@ function openCallModal(callId) {
     document.getElementById("modalSummaryText").innerText = call.callSummary || call.summary || "Транскрипция и краткое резюме звонка.";
     
     const catEl = document.getElementById("modalCallCategory");
-    if (catEl) catEl.innerText = `${call.callCategory || 'Прочее / Консультация'}${call.callSubcategory ? ' (' + call.callSubcategory + ')' : ''}`;
+    if (catEl) catEl.innerText = `${call.callCategory || 'Прочее'}${call.callSubcategory ? ' (' + call.callSubcategory + ')' : ''}`;
 
     const clientNameEl = document.getElementById("modalClientName");
     if (clientNameEl) clientNameEl.innerText = call.clientName || `Клиент (${call.phone || ''})`;
@@ -2837,7 +2836,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // 1.5. Фильтр по категории
         if (categoryVal !== "all") {
-            filtered = filtered.filter(c => (c.callCategory || "Прочее / Консультация") === categoryVal);
+            filtered = filtered.filter(c => (c.callCategory || "Прочее") === categoryVal);
         }
 
         // 2. Фильтр по коммерческому результату (продажи / услуги)
