@@ -283,9 +283,14 @@ def detect_manager_from_text(text):
     m3 = re.search(r'меня\s+зовут\s+([А-ЯЁӘІҢҒҮҰҚӨҺ][а-яёәіңғүұқөһ]{2,})', text, re.I)
     if m3:
         candidates.append(m3.group(1))
-    m4 = re.search(r'оператор\s+([А-ЯЁӘІҢҒҮҰҚӨҺ][а-яёәіңғүұқөһ]{2,})', text[:300], re.I)
+    # «оператор Диас», по-казахски «операторыңыз Нұржан»
+    m4 = re.search(r'оператор[а-яәіңғүұқөһ]*\s+([А-ЯЁӘІҢҒҮҰҚӨҺ][а-яёәіңғүұқөһ]{2,})', text[:300], re.I)
     if m4:
         candidates.append(m4.group(1))
+    # по-казахски «менің атым Нұржан» / «атым Нұржан»
+    m5 = re.search(r'\bатым\s+([А-ЯЁӘІҢҒҮҰҚӨҺ][а-яёәіңғүұқөһ]{2,})', text[:300], re.I)
+    if m5:
+        candidates.append(m5.group(1))
     for cand in candidates:
         canon = resolve_or_warn(cand, "приветствие в записи")
         if canon:

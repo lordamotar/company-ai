@@ -81,7 +81,9 @@ def resolve_or_warn(name: Optional[str], context: str = "") -> Optional[str]:
 def find_in_text(text: str, limit: int = 300) -> Optional[str]:
     """Ищет в начале текста имя любого сотрудника из справочника."""
     head = (text or "")[:limit]
-    for name in canonical_names():
-        if re.search(rf"(?<![А-Яа-яЁёA-Za-z]){re.escape(name)}(?![А-Яа-яЁёA-Za-z])", head, re.IGNORECASE):
-            return name
+    letters = "А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһA-Za-z"
+    for m in _load():
+        for variant in [m["name"]] + list(m.get("aliases", [])):   # имя и его написания (в т.ч. казахские)
+            if re.search(rf"(?<![{letters}]){re.escape(variant)}(?![{letters}])", head, re.IGNORECASE):
+                return m["name"]
     return None
