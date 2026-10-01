@@ -105,6 +105,24 @@ docker compose up -d
 
 ---
 
+## Версии анализа и эталонный набор (golden set)
+
+После `python apply_migrations.py` каждый анализ звонка сохраняется с провайдером, моделью и версией промпта
+(`call_transcriptions.analysis_*`, история — в `call_analysis_runs`). В Gemini отправляется копия аудио
+с нейтральным именем файла (без номера телефона).
+
+Проверка качества моделей на звонках, размеченных РОПом:
+```powershell
+.venv\Scripts\python golden_set.py template --last 150          # CSV для разметки в Excel
+.venv\Scripts\python golden_set.py import golden_template.csv --by "Имя РОПа"
+.venv\Scripts\python golden_set.py rerun --provider gemini      # проверочный прогон, боевые данные не меняются
+.venv\Scripts\python golden_set.py report --details             # точность по полям и чек-листу
+```
+
+Что нужно для перехода на локальный сервер и локальные модели — `docs/LOCAL_SERVER.md`.
+
+---
+
 ## Yandex DataLens (BI-дашборды)
 
 Для развертывания DataLens и построения отчетов поверх базы PostgreSQL проекта:

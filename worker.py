@@ -725,7 +725,28 @@ PROMPT_UNIFIED_ANALYSIS = """Ты — профессиональный эксп�
 """
 
 
-def transcribe_and_analyze_with_gemini(file_path, output_txt_path=None):
+def transcribe_and_analyze_with_gemini(file_path, output_txt_path=None, meta_out=None):
+    """
+    Обёртка над единым анализом Gemini.
+    В Gemini уходит обезличенная временная копия файла (без номера телефона и даты в имени).
+    Если передан словарь meta_out — в него записываются provider, model и prompt_version.
+    """
+    from analysis_runs import make_anonymized_copy, remove_quietly
+
+    abs_path = os.path.abspath(file_path)
+    if not os.path.exists(abs_path):
+        raise FileNotFoundError(f"Файл не найден: {abs_path}")
+
+    anon_path = make_anonymized_copy(abs_path)
+    try:
+        return _transcribe_and_analyze_with_gemini_impl(
+            anon_path, output_txt_path, meta_out=meta_out, log_name=os.path.basename(abs_path)
+        )
+    finally:
+        remove_quietly(anon_path)
+
+
+def _transcribe_and_analyze_with_gemini_impl(file_path, output_txt_path=None, meta_out=None, log_name=None):
     """
     Единый мультимодальный вызов Gemini API:
     Транскрибирует аудио со спикерами и таймкодами, определяет эмоции реплик,
@@ -738,11 +759,11 @@ def transcribe_and_analyze_with_gemini(file_path, output_txt_path=None):
     if not os.path.exists(abs_path):
         raise FileNotFoundError(f"Файл не найден: {abs_path}")
 
-    filename = os.path.basename(abs_path)
+    filename = log_name or os.path.basename(abs_path)
     
     temp_upload_path = None
     try:
-        filename.encode('ascii')
+        os.path.basename(abs_path).encode('ascii')
         upload_path = abs_path
     except UnicodeEncodeError:
         import tempfile
@@ -756,6 +777,7 @@ def transcribe_and_analyze_with_gemini(file_path, output_txt_path=None):
     models_to_try = get_configured_models()
     result_data = None
     raw_response_text = None
+    used_model = None
 
     keys = get_gemini_api_keys()
     max_key_attempts = max(1, len(keys))
@@ -801,6 +823,7 @@ def transcribe_and_analyze_with_gemini(file_path, output_txt_path=None):
 
                             if result_data and isinstance(result_data, dict):
                                 logging.info(f"Успешный структурированный ответ от модели {model_name}.")
+                                used_model = model_name
                                 break
                     except Exception as e:
                         err_msg = str(e)
@@ -851,6 +874,14 @@ def transcribe_and_analyze_with_gemini(file_path, output_txt_path=None):
 
     if not result_data:
         raise RuntimeError("Не удалось получить структурированный анализ от Gemini API.")
+
+    if meta_out is not None:
+        from analysis_runs import prompt_version
+        meta_out.update({
+            "provider": "gemini",
+            "model": used_model,
+            "prompt_version": prompt_version(PROMPT_UNIFIED_ANALYSIS),
+        })
 
     # Формируем читаемый текст транскрипции
     dialogue = result_data.get("dialogue", [])
@@ -985,7 +1016,10 @@ def process_file(file_path):
 
             # Единый анализ через Gemini (или fallback на двухэтапный пайплайн)
             try:
-                analysis_data, text = transcribe_and_analyze_with_gemini(processing_file, output_txt_path)
+                analysis_meta = {}
+                t_start = time.time()
+                analysis_data, text = transcribe_and_analyze_with_gemini(processing_file, output_txt_path, meta_out=analysis_meta)
+                duration_ms = int((time.time() - t_start) * 1000)
                 logging.info(f"Единый анализ Gemini успешно завершен для {filename}.")
 
                 # Определение менеджера: приоритет живому имени из приветствия
@@ -998,6 +1032,14 @@ def process_file(file_path):
                 # Сохранение всех уровней анализа в БД за одну операцию
                 from ton_voice_processor import save_unified_analysis
                 save_unified_analysis(inserted_id, processing_file, analysis_data, text, manager_name)
+
+                # Фиксируем, какой моделью и каким промптом получен анализ (для сравнения на эталоне)
+                from analysis_runs import record_run
+                record_run(
+                    unique_id, analysis_meta.get("provider", "gemini"), analysis_meta.get("model"),
+                    analysis_meta.get("prompt_version"), analysis_data,
+                    call_id=inserted_id, duration_ms=duration_ms,
+                )
 
             except Exception as e_unified:
                 logging.error(f"[-] Сбой анализа Gemini для {filename}: {e_unified}. Файл оставляем в очереди на повтор.")

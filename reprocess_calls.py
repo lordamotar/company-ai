@@ -79,7 +79,10 @@ def reprocess_call(call_row):
     
     # 3. Запускаем единый мультимодальный анализ Gemini
     try:
-        analysis_data, text = transcribe_and_analyze_with_gemini(audio_path)
+        analysis_meta = {}
+        t_start = time.time()
+        analysis_data, text = transcribe_and_analyze_with_gemini(audio_path, meta_out=analysis_meta)
+        duration_ms = int((time.time() - t_start) * 1000)
         logging.info(f"[+] Анализ Gemini успешно получен для #{call_id}")
 
         # Определяем менеджера:
@@ -106,6 +109,12 @@ def reprocess_call(call_row):
             analysis_data=analysis_data,
             full_text=text,
             manager_name=manager_to_save
+        )
+        from analysis_runs import record_run
+        record_run(
+            unique_id, analysis_meta.get("provider", "gemini"), analysis_meta.get("model"),
+            analysis_meta.get("prompt_version"), analysis_data,
+            call_id=call_id, duration_ms=duration_ms,
         )
         logging.info(f"[✓] Звонок #{call_id} успешно обновлен в БД.")
         return True

@@ -135,3 +135,41 @@ ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS checklist JSONB DEFAULT
 
 -- Эмоция каждой реплики из единого анализа Gemini (Нейтральный / Радость / Грусть / Гнев / Раздражение)
 ALTER TABLE call_text_sentiment_lines ADD COLUMN IF NOT EXISTS emotion VARCHAR(32);
+
+-- ----------------------------------------------------------
+-- Версионирование AI-анализа и эталонный набор (golden set)
+-- Нужны, чтобы сравнивать Gemini / OpenRouter / локальные модели
+-- и версии промпта на одних и тех же звонках.
+-- ----------------------------------------------------------
+
+-- Кем и чем сделан текущий (боевой) анализ звонка
+ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS analysis_provider VARCHAR(32);
+ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS analysis_model VARCHAR(128);
+ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS prompt_version VARCHAR(16);
+ALTER TABLE call_transcriptions ADD COLUMN IF NOT EXISTS analyzed_at TIMESTAMPTZ;
+
+-- История всех прогонов анализа (боевые и проверочные).
+-- Привязка по unique_id без внешнего ключа: история переживает reset_database.py.
+CREATE TABLE IF NOT EXISTS call_analysis_runs (
+    id SERIAL PRIMARY KEY,
+    unique_id VARCHAR(64) NOT NULL,
+    call_id INT,
+    provider VARCHAR(32) NOT NULL,        -- gemini | openrouter | local
+    model VARCHAR(128),
+    prompt_version VARCHAR(16),           -- первые 10 символов sha256 текста промпта
+    purpose VARCHAR(16) DEFAULT 'production', -- production | eval
+    duration_ms INT,
+    result JSONB,                         -- полный JSON-ответ модели
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_analysis_runs_unique_id ON call_analysis_runs(unique_id);
+CREATE INDEX IF NOT EXISTS idx_analysis_runs_version ON call_analysis_runs(provider, model, prompt_version);
+
+-- Эталонная разметка РОПа: «правильные ответы» для проверки качества моделей
+CREATE TABLE IF NOT EXISTS golden_calls (
+    unique_id VARCHAR(64) PRIMARY KEY,
+    labels JSONB NOT NULL,
+    verified_by VARCHAR(64),
+    note TEXT,
+    verified_at TIMESTAMPTZ DEFAULT now()
+);

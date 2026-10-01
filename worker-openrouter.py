@@ -567,7 +567,7 @@ def get_audio_format_for_openrouter(file_path):
     return "wav"
 
 
-def transcribe_and_analyze_with_openrouter(file_path, output_txt_path=None):
+def transcribe_and_analyze_with_openrouter(file_path, output_txt_path=None, meta_out=None):
     """
     Единый мультимодальный вызов OpenRouter API:
     Передает аудиофайл (base64) в совместимую модель Gemini на OpenRouter,
@@ -598,6 +598,7 @@ def transcribe_and_analyze_with_openrouter(file_path, output_txt_path=None):
 
     result_data = None
     raw_response_text = None
+    used_model = None
 
     # Таймаут увеличен до 180 секунд для больших аудио
     with httpx.Client(timeout=180.0) as http_client:
@@ -673,6 +674,7 @@ def transcribe_and_analyze_with_openrouter(file_path, output_txt_path=None):
 
                         if result_data and isinstance(result_data, dict):
                             logging.info(f"Успешный структурированный ответ от OpenRouter ({model_name}).")
+                            used_model = model_name
                             break
                             
                 except httpx.RequestError as exc:
@@ -691,6 +693,14 @@ def transcribe_and_analyze_with_openrouter(file_path, output_txt_path=None):
 
     if not result_data:
         raise RuntimeError("Не удалось получить структурированный анализ от OpenRouter API.")
+
+    if meta_out is not None:
+        from analysis_runs import prompt_version
+        meta_out.update({
+            "provider": "openrouter",
+            "model": used_model,
+            "prompt_version": prompt_version(PROMPT_UNIFIED_ANALYSIS),
+        })
 
     # Формируем читаемый текст транскрипции
     dialogue = result_data.get("dialogue", [])
@@ -825,7 +835,10 @@ def process_file(file_path):
 
             # Единый анализ через OpenRouter
             try:
-                analysis_data, text = transcribe_and_analyze_with_openrouter(processing_file, output_txt_path)
+                analysis_meta = {}
+                t_start = time.time()
+                analysis_data, text = transcribe_and_analyze_with_openrouter(processing_file, output_txt_path, meta_out=analysis_meta)
+                duration_ms = int((time.time() - t_start) * 1000)
                 logging.info(f"Единый анализ OpenRouter успешно завершен для {filename}.")
 
                 # Определение менеджера: приоритет живому имени из приветствия
@@ -838,6 +851,14 @@ def process_file(file_path):
                 # Сохранение всех уровней анализа в БД за одну операцию
                 from ton_voice_processor import save_unified_analysis
                 save_unified_analysis(inserted_id, processing_file, analysis_data, text, manager_name)
+
+                # Фиксируем, какой моделью и каким промптом получен анализ (для сравнения на эталоне)
+                from analysis_runs import record_run
+                record_run(
+                    unique_id, analysis_meta.get("provider", "openrouter"), analysis_meta.get("model"),
+                    analysis_meta.get("prompt_version"), analysis_data,
+                    call_id=inserted_id, duration_ms=duration_ms,
+                )
 
             except Exception as e_unified:
                 logging.error(f"[-] Сбой анализа OpenRouter для {filename}: {e_unified}. Файл оставляем в очереди на повтор.")
