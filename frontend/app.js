@@ -1498,6 +1498,7 @@ function openCallModal(callId) {
 
     const clientNameEl = document.getElementById("modalClientName");
     if (clientNameEl) clientNameEl.innerText = call.clientName || `Клиент (${call.phone || ''})`;
+    if (clientNameEl) clientNameEl.title = call.clientNameInherited ? "Имя взято из первого звонка с этого номера" : "";
 
     const carModelEl = document.getElementById("modalCarModel");
     if (carModelEl) carModelEl.innerText = call.carModel && call.carModel !== "Не указано" ? `🚗 ${call.carModel}` : "— (Не назван)";
@@ -2484,6 +2485,196 @@ window.saveCallEdits = saveCallEdits;
 window.openCallAndPlayAudio = openCallAndPlayAudio;
 window.initCallAudio = initCallAudio;
 window.stopCallAudio = stopCallAudio;
+
+// ---------------------------------------------------------------------------
+// Экспорт ОДНОГО звонка (открытого в модальном окне) в автономный HTML-отчёт.
+// Файл можно открыть в браузере, распечатать или сохранить в PDF.
+// ---------------------------------------------------------------------------
+function exportCurrentCall() {
+    const call = callsData.find(c => c.id == currentOpenCallId);
+    if (!call) {
+        alert("Сначала откройте звонок, который нужно экспортировать.");
+        return;
+    }
+
+    const esc = (v) => String(v === null || v === undefined ? "" : v)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    const val = (v) => {
+        if (v === null || v === undefined) return "—";
+        const s = String(v).trim();
+        return s ? esc(s) : "—";
+    };
+    const row = (label, v) => `<tr><th>${esc(label)}</th><td>${val(v)}</td></tr>`;
+
+    const saleStatus = call.saleStatus || call.outcome || "Консультация";
+    const mt = call.managerTone || {};
+    const ct = call.clientTone || {};
+    const ac = call.acoustics || {};
+
+    const checklist = Array.isArray(call.checklist) ? call.checklist : [];
+    const checklistHtml = checklist.map((item, i) => {
+        const na = item.not_applicable || item.status === "not_applicable";
+        const ok = item.passed === true || item.status === "passed";
+        const cls = na ? "na" : (ok ? "ok" : "fail");
+        const label = na ? "Не применимо" : (ok ? "Выполнено" : "Не выполнено");
+        return `<div class="chk ${cls}"><div class="chk-head"><b>${i + 1}. ${val(item.title)}</b><span class="tag ${cls}">${label}</span></div><div class="chk-desc">${val(item.desc)}</div></div>`;
+    }).join("");
+
+    const dialogue = Array.isArray(call.dialogue) ? call.dialogue : [];
+    // Время реплики — приблизительное (так же, как в окне звонка: равномерно по длительности записи)
+    const totalSec = call.durationSec || 60;
+    const dialogueHtml = dialogue.map((m, idx) => {
+        const isMgr = m.role === "manager" || m.speaker === "Менеджер";
+        let sCls = "neutral", sLbl = "НЕЙТРАЛЬНО";
+        if (m.sentiment === "positive" || m.sentiment === "ПОЗИТИВ") { sCls = "positive"; sLbl = "ПОЗИТИВ"; }
+        else if (m.sentiment === "negative" || m.sentiment === "НЕГАТИВ") { sCls = "negative"; sLbl = "НЕГАТИВ"; }
+        const timeTag = (typeof formatAudioTime === "function") ? formatAudioTime((idx / dialogue.length) * totalSec) : "";
+        return `<div class="msg ${isMgr ? "mgr" : "cli"}"><div class="who"><span>${esc(m.speaker || (isMgr ? "Менеджер" : "Клиент"))}${timeTag ? ` <span class="time">≈ ${esc(timeTag)}</span>` : ""}</span><span class="sent ${sCls}">${sLbl}</span></div><div class="txt">${val(m.text)}</div></div>`;
+    }).join("");
+
+    const tags = Array.isArray(call.callTags) ? call.callTags.map(t => `<span class="chip">${esc(t)}</span>`).join(" ") : "";
+    const generated = new Date().toLocaleString("ru-RU");
+
+    const docHtml = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Звонок #${esc(call.id)} — ${esc(call.date)} ${esc(call.time)}</title>
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #f8fafc; color: #1e293b; margin: 0; padding: 24px; line-height: 1.5; }
+    .container { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+    h1 { margin: 0 0 6px 0; font-size: 24px; color: #0f172a; }
+    h2 { font-size: 17px; margin: 28px 0 10px 0; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; color: #0f172a; }
+    .sub { color: #64748b; font-size: 14px; }
+    .btn { background: #2563eb; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; width: 38%; color: #64748b; font-weight: 600; padding: 6px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 16px 0; }
+    .kpi { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; }
+    .kpi .lbl { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600; }
+    .kpi .num { font-size: 18px; font-weight: 700; margin-top: 2px; }
+    .summary { background: #f8fafc; border-left: 4px solid #2563eb; padding: 12px 16px; border-radius: 0 8px 8px 0; font-size: 14.5px; }
+    .chip { display: inline-block; background: #e0f2fe; color: #075985; border-radius: 999px; padding: 2px 10px; font-size: 12px; margin: 2px 2px 2px 0; }
+    .chk { border: 1px solid #e2e8f0; border-left-width: 4px; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; page-break-inside: avoid; }
+    .chk.ok { border-left-color: #16a34a; } .chk.fail { border-left-color: #dc2626; } .chk.na { border-left-color: #94a3b8; }
+    .chk-head { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+    .chk-desc { font-size: 13px; color: #475569; margin-top: 4px; }
+    .tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+    .tag.ok { background: #dcfce7; color: #166534; } .tag.fail { background: #fee2e2; color: #991b1b; } .tag.na { background: #f1f5f9; color: #475569; }
+    .msg { padding: 8px 12px; border-radius: 8px; margin: 6px 0; max-width: 85%; font-size: 14px; page-break-inside: avoid; }
+    .msg.mgr { background: #eff6ff; border: 1px solid #bfdbfe; }
+    .msg.cli { background: #f8fafc; border: 1px solid #e2e8f0; margin-left: auto; }
+    .who { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 2px; }
+    .who .time { font-weight: 400; opacity: 0.7; margin-left: 6px; }
+    .sent { font-size: 10px; padding: 1px 6px; border-radius: 4px; }
+    .sent.positive { background: #dcfce7; color: #166534; } .sent.negative { background: #fee2e2; color: #991b1b; } .sent.neutral { background: #f1f5f9; color: #475569; }
+    .meta { font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 14px; margin-top: 28px; }
+    @media print {
+        body { background: #fff; padding: 0; }
+        .container { box-shadow: none; padding: 0; max-width: 100%; }
+        .no-print { display: none !important; }
+    }
+    @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+    <button class="btn no-print" onclick="window.print()">🖨️ Распечатать / Сохранить в PDF</button>
+    <h1>Звонок #${esc(call.id)} · ${val(call.directionLabel)}</h1>
+    <div class="sub">${val(call.date)} ${esc(call.time || "")} · длительность ${val(call.duration)} · ${val(call.phone)}</div>
+    <div style="margin-top:8px;">${tags}</div>
+
+    <div class="kpis">
+        <div class="kpi"><div class="lbl">Результат</div><div class="num" style="font-size:14px;">${val(saleStatus)}</div></div>
+        <div class="kpi"><div class="lbl">Сумма заказа</div><div class="num">${val(call.orderSum)}</div></div>
+        <div class="kpi"><div class="lbl">Скрипт</div><div class="num">${call.scriptScore !== undefined && call.scriptScore !== null ? esc(call.scriptScore) + "%" : "—"}</div></div>
+        <div class="kpi"><div class="lbl">CSAT</div><div class="num">${val(call.csat)}${call.csat ? " / 5" : ""}</div></div>
+        <div class="kpi"><div class="lbl">Вежливость</div><div class="num">${val(call.managerPoliteness)}</div></div>
+        <div class="kpi"><div class="lbl">Конфликт</div><div class="num">${call.conflict ? "Да" : "Нет"}</div></div>
+    </div>
+
+    <h2>Резюме звонка</h2>
+    <div class="summary">${val(call.callSummary || call.summary)}</div>
+    ${call.conflict && call.conflictReason ? `<p><b>Причина конфликта:</b> ${val(call.conflictReason)}</p>` : ""}
+    ${call.opportunity ? `<p><b>Возможность для менеджера:</b> ${val(call.opportunity)}</p>` : ""}
+
+    <h2>Данные звонка и сделки</h2>
+    <div class="grid-2">
+        <table>
+            ${row("Менеджер", call.manager)}
+            ${row("Клиент", call.clientName)}
+            ${row("Город", call.city)}
+            ${row("Филиал", call.branchAddress)}
+            ${row("Категория", call.callCategory)}
+            ${row("Подкатегория", call.callSubcategory)}
+            ${row("Тема", call.topic)}
+        </table>
+        <table>
+            ${row("Автомобиль", call.carModel)}
+            ${row("Бренд шин", call.tireBrand)}
+            ${row("Типоразмер", call.tireSize)}
+            ${row("Сезон", call.tireSeason)}
+            ${row("Количество", call.tireCount)}
+            ${row("Способ оплаты", call.paymentMethod)}
+            ${row("Причина отказа", call.lostReason)}
+        </table>
+    </div>
+    <table style="margin-top:10px;">
+        ${row("Допродажа", call.hasUpsell ? `Да — ${call.upsellSum || ""} ${call.upsellText || ""}` : "Нет")}
+        ${row("Запись на услугу", call.serviceBooking)}
+        ${row("Дата услуги", call.serviceDate)}
+    </table>
+
+    <h2>Тон-войс и акустика</h2>
+    <div class="grid-2">
+        <table>
+            <tr><th colspan="2" style="width:auto;color:#0f172a;">Менеджер</th></tr>
+            ${row("Тон", mt.dominant)}
+            ${row("Описание", mt.description)}
+            ${row("Позитив / нейтрал / негатив", mt.happy !== undefined ? `${mt.happy}% / ${mt.neutral}% / ${(Number(mt.sad) || 0) + (Number(mt.angry) || 0)}%` : null)}
+        </table>
+        <table>
+            <tr><th colspan="2" style="width:auto;color:#0f172a;">Клиент</th></tr>
+            ${row("Тон", ct.dominant)}
+            ${row("Настроение", ct.sentimentStart ? `${ct.sentimentStart} → ${ct.sentimentEnd || "—"}` : null)}
+            ${row("Позитив / нейтрал / негатив", ct.happy !== undefined ? `${ct.happy}% / ${ct.neutral}% / ${(Number(ct.sad) || 0) + (Number(ct.angry) || 0)}%` : null)}
+        </table>
+    </div>
+    <table style="margin-top:10px;">
+        ${row("Общая эмоция звонка", call.emotion ? `${call.emotion}${call.emotionPct ? " (" + call.emotionPct + ")" : ""}` : null)}
+        ${row("Темп речи", ac.tempo)}
+        ${row("Паузы / тишина", ac.silence)}
+        ${row("Громкие моменты", ac.loudMoments)}
+    </table>
+
+    <h2>Чек-лист скрипта</h2>
+    ${checklistHtml || "<p>Чек-лист отсутствует.</p>"}
+
+    <h2>Транскрипция (${dialogue.length} реплик; время указано приблизительно)</h2>
+    ${dialogueHtml || "<p>Транскрипция отсутствует.</p>"}
+
+    <div class="meta">AIKOS CRM Voice Analytics · экспорт звонка #${esc(call.id)} · сформировано ${esc(generated)}</div>
+</div>
+</body>
+</html>`;
+
+    const safeDate = String(call.date || "").replace(/[^0-9.]/g, "").split(".").reverse().join("-");
+    const filename = `aikos-call-${call.id}${safeDate ? "-" + safeDate : ""}.html`;
+    const blob = new Blob([docHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+window.exportCurrentCall = exportCurrentCall;
 
 // Сохранение изменений звонка через POST API
 async function saveCallEdits() {

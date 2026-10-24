@@ -204,6 +204,54 @@ def export_audit_logs_to_json(output_file=DEFAULT_AUDIT_JSON, write_to_file=True
         logging.error(f"[!] Ошибка экспорта журнала аудита: {e}")
         return []
 
+_PLACEHOLDER_NAMES = {"клиент", "не указано", "не назван", "неизвестно", "неизвестный", "null", "none", "—", "-"}
+
+
+def _is_real_client_name(name):
+    """Настоящее имя клиента (а не пусто или заглушка)."""
+    n = (name or "").strip()
+    return bool(n) and n.lower() not in _PLACEHOLDER_NAMES and not n.lower().startswith("клиент (")
+
+
+def _phone_key(phone):
+    """Ключ для сопоставления звонков одного клиента: последние 10 цифр номера.
+    87001234567 и +7 700 123-45-67 дают один ключ. Короткие внутренние номера (1146) не сопоставляются."""
+    digits = re.sub(r"\D", "", str(phone or ""))
+    return digits[-10:] if len(digits) >= 10 else None
+
+
+def _call_sort_key(call):
+    try:
+        dt = datetime.strptime(f"{call.get('date')} {call.get('time')}", "%d.%m.%Y %H:%M:%S")
+    except (TypeError, ValueError):
+        dt = datetime.min
+    return (dt, call.get("id") or 0)
+
+
+def _inherit_client_names(calls, named_call_ids):
+    """Подставляет имя клиента в более поздние звонки с того же номера, где имя не определено.
+
+    Имя берётся из самого раннего звонка этого номера, где оно названо (named_call_ids).
+    Более ранние звонки не меняются. В БД ничего не пишется, порядок списка сохраняется.
+    Вернёт количество звонков, которым имя было подставлено."""
+    first_named = {}
+    for c in sorted(calls, key=_call_sort_key):
+        key = _phone_key(c.get("phone"))
+        if key and c.get("id") in named_call_ids and key not in first_named:
+            first_named[key] = c
+    filled = 0
+    for c in calls:
+        if c.get("id") in named_call_ids:
+            continue
+        key = _phone_key(c.get("phone"))
+        src = first_named.get(key) if key else None
+        if src and _call_sort_key(src) < _call_sort_key(c):
+            c["clientName"] = src["clientName"]
+            c["clientNameInherited"] = True
+            filled += 1
+    return filled
+
+
 def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
     try:
         conn = psycopg2.connect(**DB_CONFIG)
@@ -231,6 +279,7 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
         rows = cursor.fetchall()
 
         calls = []
+        named_call_ids = set()  # звонки, где имя клиента реально названо (есть в БД)
         for r in rows:
             call_id = r[0]
             unique_id = r[1]
@@ -396,6 +445,10 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             tire_size_str = normalize_tire_size(db_tire_size) or det_size
             topic_str = f"{brand_name} {tire_size_str}" if brand_name else "Консультация по шинам"
             client_name = db_client_name or (f"Клиент (+..{phone[-4:]})" if phone and len(phone) >= 4 else "Клиент")
+            if _is_real_client_name(db_client_name):
+                named_call_ids.add(call_id)
+            else:
+                client_name = f"Клиент (+..{phone[-4:]})" if phone and len(phone) >= 4 else "Клиент"
 
             if db_duration_sec and db_duration_sec > 0:
                 total_sec = db_duration_sec
@@ -538,6 +591,7 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 "durationSec": total_sec,
                 "manager": manager_name,
                 "clientName": client_name,
+                "clientNameInherited": False,
                 "carModel": db_car_model or "Не указано",
                 "tireBrand": brand_name,
                 "tireSize": tire_size_str,
@@ -625,6 +679,11 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 """, (call_category, call_subcategory, json.dumps(call_tags, ensure_ascii=False), det_brand, call_id))
             except Exception:
                 pass
+
+        # Имя из первого звонка клиента подставляется в его следующие звонки с тем же номером
+        inherited = _inherit_client_names(calls, named_call_ids)
+        if inherited:
+            logging.info(f"[+] Имя клиента подставлено по номеру телефона в {inherited} звонков.")
 
         conn.commit()
         cursor.close()
