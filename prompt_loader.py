@@ -23,4 +23,9 @@ def load_prompt(name):
     if "{{CATEGORIES}}" in text:
         from call_categories import category_prompt_block
         text = text.replace("{{CATEGORIES}}", category_prompt_block().strip("\n"))
+    if "{{LEAD_SCORING}}" in text:
+        # Оценка клиента и следующий шаг: пустая строка, пока ENABLE_LEAD_SCORING не true (см. lead_scoring.py)
+        from lead_scoring import prompt_block
+        text = text.replace("{{LEAD_SCORING}}", prompt_block())
+    text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip() + "\n"

@@ -23,13 +23,13 @@ transcriptions/
 test/
 __pycache__/
 *.pyc
-*.pyo   
-postgres/
-n8n_data/
 *.log
 frontend/*.json
 html/*.json
 call/
+*.pyo   
+postgres/
+n8n_data/
 datalens/
 
 # Системный промпт AI-анализа — часть проекта, в git должен попадать

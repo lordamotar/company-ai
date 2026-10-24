@@ -944,7 +944,9 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
         client_name = comm.get("client_name")
         car_model = comm.get("car_model")
         tire_brand = comm.get("tire_brand")
-        tire_size = comm.get("tire_size")
+        # Проверка типоразмера: номера телефонов и заказов, продиктованные цифрами, отбрасываются
+        from tire_sizes import normalize_tire_size
+        tire_size = normalize_tire_size(comm.get("tire_size"))
         tire_season = comm.get("tire_season")
         raw_count = comm.get("tire_count")
         tire_count = None
@@ -1033,6 +1035,17 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
             json.dumps(chk, ensure_ascii=False),
             call_id
         ))
+
+        # Оценка клиента и следующий шаг — только при ENABLE_LEAD_SCORING=true
+        # (нужна миграция migrations/lead_scoring.sql, см. lead_scoring.py)
+        from lead_scoring import is_enabled as lead_scoring_enabled, extract_lead_fields
+        if lead_scoring_enabled():
+            lf = extract_lead_fields(analysis_data)
+            cursor.execute("""
+                UPDATE call_transcriptions
+                SET lead_grade = %s, lead_grade_reason = %s, non_target_reason = %s, next_step = %s
+                WHERE id = %s;
+            """, (lf["lead_grade"], lf["lead_grade_reason"], lf["non_target_reason"], lf["next_step"], call_id))
 
         conn.commit()
         logging.info(f"[+] Единый анализ успешно сохранен для call_id={call_id}: статус='{sale_status}', сумма={order_sum}, чек-лист={len(chk)} пунктов.")

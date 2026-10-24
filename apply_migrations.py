@@ -42,4 +42,5 @@ def apply_migration(sql_file="init_tone_tables.sql"):
         print("Убедитесь, что Docker-контейнер PostgreSQL запущен командой: docker compose up -d")
 
 if __name__ == "__main__":
-    apply_migration()
+    # По умолчанию — основная миграция; дополнительная: python apply_migrations.py migrations/<файл>.sql
+    apply_migration(sys.argv[1] if len(sys.argv) > 1 else "init_tone_tables.sql")
