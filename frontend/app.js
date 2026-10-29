@@ -867,7 +867,7 @@ function openManagerAnalytics(managerName) {
             </td>
             <td>
                 <div class="client-phone">${c.phone}</div>
-                <div class="client-city">${c.city || "Алматы"}</div>
+                <div class="client-city" title="Откуда звонит клиент → город филиала">${c.clientCity ? c.clientCity + " → " : ""}${c.city || "Алматы"}</div>
             </td>
             <td>
                 <div class="topic-title">${c.topic}</div>
@@ -939,6 +939,11 @@ function groupCallsByClient(data) {
         if (!clientsMap[phone]) {
             clientsMap[phone] = {
                 phone: phone,
+                clientCity: "",
+                company: "",
+                bin: "",
+                binOk: null,
+                branches: new Set(),
                 city: call.city || "Алматы",
                 calls: [],
                 topics: new Set(),
@@ -953,6 +958,10 @@ function groupCallsByClient(data) {
 
         const client = clientsMap[phone];
         client.calls.push(call);
+        if (call.clientCity && !client.clientCity) client.clientCity = call.clientCity;
+        if (call.companyName && !client.company) client.company = call.companyName;
+        if (call.clientBin && !client.bin) { client.bin = call.clientBin; client.binOk = call.clientBinChecksumOk; }
+        if (call.branch && call.branch.name) client.branches.add(`${call.branch.name} (${call.branch.city})`);
         if (call.city && (!client.city || client.city === "Алматы")) client.city = call.city;
         if (call.topic) client.topics.add(call.topic);
         if (call.tireSize && call.tireSize !== "—") client.tireSizes.add(call.tireSize);
@@ -988,6 +997,11 @@ function groupCallsByClient(data) {
 
         return {
             phone: c.phone,
+            clientCity: c.clientCity,
+            company: c.company,
+            bin: c.bin,
+            binOk: c.binOk,
+            branches: Array.from(c.branches),
             city: c.city,
             totalCalls: totalCalls,
             inCalls: c.calls.filter(x => x.direction === "in").length,
@@ -1112,7 +1126,7 @@ function renderClients(data, keepPage = false) {
                 </div>
             </td>
             <td>
-                <span class="city-tag">${client.city || "Алматы"}</span>
+                <span class="city-tag">${client.clientCity ? "из " + client.clientCity : (client.city || "Алматы")}</span>
             </td>
             <td>
                 <div style="display: flex; flex-direction: column; gap: 2px;">
@@ -1187,7 +1201,12 @@ function openClientModal(phoneNumber) {
 
     // Шапка
     document.getElementById("clientModalPhone").innerText = `📱 ${client.phone}`;
-    document.getElementById("clientModalSubtitle").innerText = `Город: ${client.city} • Зафиксированный интерес: ${client.tireSizes.join(", ") || "Шины и услуги"}`;
+    document.getElementById("clientModalSubtitle").innerText = [
+        client.clientCity ? `Клиент из: ${client.clientCity}` : null,
+        client.branches.length ? `Филиал: ${client.branches.join(", ")}` : `Город филиала: ${client.city}`,
+        client.company ? `Компания: ${client.company}${client.bin ? ", БИН " + client.bin : ""}` : null,
+        `Зафиксированный интерес: ${client.tireSizes.join(", ") || "Шины и услуги"}`
+    ].filter(Boolean).join(" • ");
     document.getElementById("clientModalCallsBadge").innerText = `${client.totalCalls} ${client.totalCalls === 1 ? 'обращение' : 'обращения'}`;
     document.getElementById("clientModalCsatBadge").innerText = `⭐ ${client.avgCsat} / 5.0 CSAT`;
     document.getElementById("clientModalStatusBadge").innerText = client.totalCalls > 1 ? "🔥 Постоянный клиент" : "Новый клиент";
@@ -1411,6 +1430,10 @@ function switchView(viewId) {
         } else {
             renderAuditLogs(auditLogsData, true);
         }
+    } else if (viewId === "view-branches") {
+        if (heading) heading.innerText = "Справочник филиалов";
+        if (subheading) subheading.innerText = "Города, названия и адреса филиалов: к ним приводятся названия, которые клиенты и менеджеры называют в звонках";
+        if (typeof window.initBranches === "function") window.initBranches();
     }
 }
 
@@ -1452,6 +1475,43 @@ let currentActiveModalTab = "tab-summary";
 let currentPlaybackSpeed = 1.0;
 
 // Открытие модального окна с детальным разбором звонка
+// Подпись филиала для брони: из справочника (название, адрес, город) или как прозвучало в звонке
+function formatBranchLabel(call) {
+    const b = call.branch;
+    if (b) {
+        return `${b.name}${b.address ? " — " + b.address : ""} (г. ${b.city})`;
+    }
+    const raw = (call.branchAddress || "").trim();
+    const isFallback = !raw || raw === "Филиал Aikos" || /^г\.\s/.test(raw);
+    if (call.branchMatchedBy === "none" && !isFallback) {
+        return `${raw}${call.city && call.city !== "Не указан" ? " (г. " + call.city + ")" : ""} — нет в справочнике`;
+    }
+    return raw || (call.city ? `г. ${call.city}` : "Не указан");
+}
+
+function isDiscCall(call) {
+    return call.productType === "Диски" || call.productType === "Шины и диски" || Boolean(call.discSize);
+}
+
+// Товар: тип (шины / диски...) и сезон для шин
+function formatProductLabel(call) {
+    if (call.productType) {
+        const withSeason = (call.productType === "Шины" || call.productType === "Шины и диски") && call.tireSeason && call.tireSeason !== "Не указано";
+        return withSeason ? `${call.productType} · ${call.tireSeason}` : call.productType;
+    }
+    return call.tireSeason || call.productCat || "Зимние шины";
+}
+
+function formatLegalLabel(call) {
+    const parts = [];
+    parts.push(call.companyName || "Юрлицо (название не названо)");
+    if (call.clientBin) {
+        parts.push(`БИН ${call.clientBin}`);
+        if (call.clientBinChecksumOk === false) parts.push("⚠ контрольная цифра не сходится, проверьте цифры по записи");
+    }
+    return parts.join(" · ");
+}
+
 function openCallModal(callId) {
     const call = callsData.find(c => c.id == callId);
     if (!call) return;
@@ -1481,7 +1541,7 @@ function openCallModal(callId) {
         const mDirEl = document.getElementById("modalCallDirection");
         if (mDirEl) mDirEl.innerText = call.directionLabel || (call.direction === "out" ? "Исходящий звонок" : "Входящий звонок");
         const mPhoneEl = document.getElementById("modalPhoneTitle");
-        if (mPhoneEl) mPhoneEl.innerText = `${call.phone || 'Клиент'} (${call.city || 'Казахстан'})`;
+        if (mPhoneEl) mPhoneEl.innerText = `${call.phone || 'Клиент'}${call.clientCity ? ' (из г. ' + call.clientCity + ')' : ''}`;
 
         const editModalBtn = document.getElementById("openEditFromModalBtn");
         if (editModalBtn) {
@@ -1503,11 +1563,29 @@ function openCallModal(callId) {
     const carModelEl = document.getElementById("modalCarModel");
     if (carModelEl) carModelEl.innerText = call.carModel && call.carModel !== "Не указано" ? `🚗 ${call.carModel}` : "— (Не назван)";
 
+    const clientCityEl = document.getElementById("modalClientCity");
+    if (clientCityEl) {
+        clientCityEl.innerText = call.clientCity ? call.clientCity : "— (не назвал)";
+        clientCityEl.title = call.clientProfileInherited && call.clientCity ? "Город взят из более раннего звонка с этого номера" : "";
+    }
+
     const cityEl = document.getElementById("modalCity");
-    if (cityEl) cityEl.innerText = call.branchAddress || (call.city ? `г. ${call.city}` : "Алматы");
+    if (cityEl) cityEl.innerText = formatBranchLabel(call);
 
     const productCatEl = document.getElementById("modalProductCat");
-    if (productCatEl) productCatEl.innerText = call.tireSeason || call.productCat || "Зимние шины";
+    if (productCatEl) productCatEl.innerText = formatProductLabel(call);
+
+    const legalWrap = document.getElementById("modalLegalWrap");
+    const legalEl = document.getElementById("modalLegal");
+    if (legalWrap && legalEl) {
+        if (call.isLegalEntity || call.companyName || call.clientBin) {
+            legalWrap.style.display = "flex";
+            legalEl.innerText = formatLegalLabel(call);
+            legalEl.title = call.clientProfileInherited ? "Реквизиты взяты из более раннего звонка с этого номера" : "";
+        } else {
+            legalWrap.style.display = "none";
+        }
+    }
 
     const tireBrandEl = document.getElementById("modalTireBrand");
     if (tireBrandEl) {
@@ -1515,8 +1593,21 @@ function openCallModal(callId) {
     }
 
     const tireSizeEl = document.getElementById("modalTireSize");
+    const tireSizeLabelEl = document.getElementById("modalTireSizeLabel");
+    if (tireSizeLabelEl) tireSizeLabelEl.innerText = isDiscCall(call) ? "Размер шины (под подбор диска)" : "Типоразмер";
     if (tireSizeEl) {
         tireSizeEl.innerText = call.tireSize || "— (Не указан)";
+    }
+
+    const discWrap = document.getElementById("modalDiscSizeWrap");
+    const discEl = document.getElementById("modalDiscSize");
+    if (discWrap && discEl) {
+        if (isDiscCall(call)) {
+            discWrap.style.display = "flex";
+            discEl.innerText = call.discSize || "— (не назван)";
+        } else {
+            discWrap.style.display = "none";
+        }
     }
 
     const tireCountEl = document.getElementById("modalTireCount");
@@ -2412,6 +2503,14 @@ function openEditCallModal(callId) {
     const commentInput = document.getElementById("editCommentInput");
     if (commentInput) commentInput.value = "";
 
+    // Клиент и товар (новые поля)
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
+    setVal("editClientCity", call.clientCity);
+    setVal("editProductType", call.productType);
+    setVal("editDiscSize", call.discSize);
+    setVal("editCompanyName", call.companyName);
+    setVal("editClientBin", call.clientBin);
+
     // Заполнение коммерческих полей (продажа, допродажа, запись на услугу)
     const saleStatusSelect = document.getElementById("editSaleStatus");
     const orderSumInput = document.getElementById("editOrderSum");
@@ -2607,16 +2706,18 @@ function exportCurrentCall() {
         <table>
             ${row("Менеджер", call.manager)}
             ${row("Клиент", call.clientName)}
-            ${row("Город", call.city)}
-            ${row("Филиал", call.branchAddress)}
+            ${row("Клиент из города", call.clientCity)}
+            ${row("Филиал для брони", formatBranchLabel(call))}
             ${row("Категория", call.callCategory)}
             ${row("Подкатегория", call.callSubcategory)}
             ${row("Тема", call.topic)}
         </table>
         <table>
             ${row("Автомобиль", call.carModel)}
-            ${row("Бренд шин", call.tireBrand)}
-            ${row("Типоразмер", call.tireSize)}
+            ${row("Товар", call.productType)}
+            ${row("Бренд", call.tireBrand)}
+            ${row(isDiscCall(call) ? "Размер шины (под подбор диска)" : "Типоразмер", call.tireSize)}
+            ${isDiscCall(call) ? row("Размер диска", call.discSize) : ""}
             ${row("Сезон", call.tireSeason)}
             ${row("Количество", call.tireCount)}
             ${row("Способ оплаты", call.paymentMethod)}
@@ -2627,6 +2728,7 @@ function exportCurrentCall() {
         ${row("Допродажа", call.hasUpsell ? `Да — ${call.upsellSum || ""} ${call.upsellText || ""}` : "Нет")}
         ${row("Запись на услугу", call.serviceBooking)}
         ${row("Дата услуги", call.serviceDate)}
+        ${(call.isLegalEntity || call.companyName || call.clientBin) ? row("Юрлицо", formatLegalLabel(call)) : ""}
     </table>
 
     <h2>Тон-войс и акустика</h2>
@@ -2701,6 +2803,22 @@ async function saveCallEdits() {
     const alertEl = document.getElementById("editModalAlert");
     const saveBtn = document.getElementById("saveEditModalBtn");
 
+    const readField = (id) => (document.getElementById(id)?.value || "").trim() || null;
+    const clientCity = readField("editClientCity");
+    const productType = readField("editProductType");
+    const discSize = readField("editDiscSize");
+    const companyName = readField("editCompanyName");
+    const clientBin = readField("editClientBin");
+    if (clientBin && clientBin.replace(/\D/g, "").length !== 12) {
+        if (alertEl) {
+            alertEl.style.display = "block";
+            alertEl.style.background = "rgba(239, 68, 68, 0.15)";
+            alertEl.style.color = "#f87171";
+            alertEl.innerText = "БИН / ИИН должен состоять ровно из 12 цифр.";
+        }
+        return;
+    }
+
     if (!managerName) {
         if (alertEl) {
             alertEl.style.display = "block";
@@ -2734,7 +2852,12 @@ async function saveCallEdits() {
                 upsell_sum: upsellSum,
                 upsell_text: upsellText,
                 service_booking: serviceBooking,
-                service_date: serviceDate
+                service_date: serviceDate,
+                client_city: clientCity,
+                product_type: productType,
+                disc_size: discSize,
+                company_name: companyName,
+                client_bin: clientBin
             })
         });
 

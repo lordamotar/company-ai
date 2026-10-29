@@ -1,0 +1,26 @@
+/* Страница «Филиалы» (справочник): форма, таблица, несопоставленные названия */
+.br-intro { padding: 14px 18px; margin-bottom: 16px; color: var(--text-secondary); font-size: 13.5px; line-height: 1.55; }
+.br-intro p { margin: 0; }
+.br-form-card { padding: 16px 18px; margin-bottom: 16px; }
+.br-form-card h3 { margin: 0 0 12px 0; font-size: 15px; }
+.br-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.br-form-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.br-form-grid input { background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; color: var(--text-primary); font-size: 13px; font-weight: 400; }
+.br-form-grid input:focus { outline: none; border-color: var(--accent-blue); }
+.br-form-actions { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.br-message { font-size: 12.5px; }
+.br-message.error { color: #f87171; }
+.br-message.ok { color: #34d399; }
+.br-alias { display: inline-block; background: rgba(56, 189, 248, 0.10); border: 1px solid rgba(56, 189, 248, 0.25); color: var(--text-primary); border-radius: 999px; padding: 1px 9px; font-size: 11.5px; margin: 2px 4px 2px 0; }
+.br-muted { color: var(--text-secondary); }
+.br-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.br-empty { padding: 22px; text-align: center; color: var(--text-secondary); font-size: 13.5px; }
+#brUnmatchedCard { padding: 16px 18px; margin-top: 16px; }
+#brUnmatchedCard h3 { margin: 0 0 6px 0; font-size: 15px; }
+.br-count { display: inline-block; min-width: 20px; text-align: center; background: rgba(245, 158, 11, 0.18); color: #fbbf24; border-radius: 999px; padding: 0 8px; font-size: 12px; margin-left: 6px; }
+.br-hint { color: var(--text-secondary); font-size: 12.5px; margin: 4px 0 12px 0; }
+.br-unmatched-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 0; border-top: 1px solid var(--border-color); }
+.br-unmatched-name { flex: 1 1 220px; font-weight: 600; font-size: 13.5px; }
+.br-unmatched-name small { font-weight: 400; color: var(--text-secondary); margin-left: 6px; }
+.br-unmatched-row select { max-width: 220px; }
+@media (max-width: 640px) { .br-row-actions { justify-content: flex-start; } }

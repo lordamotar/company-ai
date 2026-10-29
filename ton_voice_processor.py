@@ -747,6 +747,9 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
     """
     logging.info(f"=== Сохранение единого анализа звонка для call_id={call_id} ===")
     conn = psycopg2.connect(**DB_CONFIG)
+    # Таблица филиалов и новые колонки звонка (город клиента, тип товара, юрлицо) создаются автоматически
+    from branch_registry import ensure_schema
+    ensure_schema(conn)
     cursor = conn.cursor()
 
     try:
@@ -968,6 +971,16 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
         call_category, call_subcategory = normalize_category(comm.get("call_category"), comm.get("call_subcategory"))
         call_tags = comm.get("call_tags", [])
         city_name = comm.get("city_name")
+        # Новые поля: город КЛИЕНТА (отдельно от города филиала), тип товара, размер диска, юрлицо
+        from branch_registry import (normalize_product_type, normalize_bin, clean_text, normalize_bool)
+        client_city = clean_text(comm.get("client_city"), 64)
+        product_type = normalize_product_type(comm.get("product_type"))
+        disc_size = clean_text(comm.get("disc_size"), 64)
+        is_legal_entity = normalize_bool(comm.get("is_legal_entity"))
+        company_name = clean_text(comm.get("company_name"), 256)
+        client_bin = normalize_bin(comm.get("client_bin"))
+        if client_bin or company_name:
+            is_legal_entity = True
 
         cursor.execute("""
             UPDATE call_transcriptions
@@ -1005,6 +1018,12 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
                 call_category = %s,
                 call_subcategory = %s,
                 call_tags = %s,
+                client_city = %s,
+                product_type = %s,
+                disc_size = %s,
+                is_legal_entity = %s,
+                company_name = %s,
+                client_bin = %s,
                 checklist = %s
             WHERE id = %s;
         """, (
@@ -1032,6 +1051,7 @@ def save_unified_analysis(call_id, file_path, analysis_data, full_text, manager_
             call_category,
             call_subcategory,
             json.dumps(call_tags, ensure_ascii=False),
+            client_city, product_type, disc_size, is_legal_entity, company_name, client_bin,
             json.dumps(chk, ensure_ascii=False),
             call_id
         ))

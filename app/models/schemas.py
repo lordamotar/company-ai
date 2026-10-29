@@ -25,6 +25,12 @@ class CallUpdateRequest(BaseModel):
     lost_reason: Optional[str] = Field(default=None, description="Причина отказа", examples=["Нет нужного размера"])
     call_category: Optional[str] = Field(default=None, description="Категория звонка", examples=["Запись на шиномонтаж"])
     call_subcategory: Optional[str] = Field(default=None, description="Подкатегория звонка", examples=["Сервисное обслуживание"])
+    client_city: Optional[str] = Field(default=None, description="Город, откуда звонит клиент", examples=["Астана"])
+    product_type: Optional[str] = Field(default=None, description="Тип товара: Шины / Диски / Шины и диски / Услуга / Другое", examples=["Диски"])
+    disc_size: Optional[str] = Field(default=None, description="Размер диска", examples=["22.5x9.00"])
+    is_legal_entity: Optional[bool] = Field(default=None, description="Клиент — юрлицо", examples=[True])
+    company_name: Optional[str] = Field(default=None, description="Название компании", examples=["Поволжье-Логистика"])
+    client_bin: Optional[str] = Field(default=None, description="БИН / ИИН (12 цифр)", examples=["123456789012"])
 
 class CallUpdateResponse(BaseModel):
     success: bool

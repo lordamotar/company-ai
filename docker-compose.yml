@@ -70,6 +70,7 @@ services:
       - ./export_db_to_json.py:/app/export_db_to_json.py
       - ./call_categories.py:/app/call_categories.py
       - ./tire_sizes.py:/app/tire_sizes.py
+      - ./branch_registry.py:/app/branch_registry.py
       - ./frontend:/app/frontend
       - ./prompts:/app/prompts
       - ./incoming:/app/incoming

@@ -228,6 +228,40 @@ def _call_sort_key(call):
     return (dt, call.get("id") or 0)
 
 
+def _inherit_client_requisites(calls):
+    """Данные клиента (название компании, БИН, город клиента) из ранних звонков с того же номера подставляются
+    в более поздние, где они не названы. Берётся самое раннее значение. В БД ничего не пишется."""
+    first = {}
+    for c in sorted(calls, key=_call_sort_key):
+        key = _phone_key(c.get("phone"))
+        if not key:
+            continue
+        slot = first.setdefault(key, {})
+        for field in ("companyName", "clientBin", "clientCity"):
+            if c.get(field) and field not in slot:
+                slot[field] = (c[field], _call_sort_key(c), c.get("clientBinChecksumOk"))
+    filled = 0
+    for c in calls:
+        key = _phone_key(c.get("phone"))
+        slot = first.get(key) if key else None
+        if not slot:
+            continue
+        changed = legal = False
+        for field in ("companyName", "clientBin", "clientCity"):
+            if not c.get(field) and field in slot and slot[field][1] < _call_sort_key(c):
+                c[field] = slot[field][0]
+                if field == "clientBin":
+                    c["clientBinChecksumOk"] = slot[field][2]
+                changed = True
+                legal = legal or field != "clientCity"
+        if changed:
+            if legal:
+                c["isLegalEntity"] = True
+            c["clientProfileInherited"] = True
+            filled += 1
+    return filled
+
+
 def _inherit_client_names(calls, named_call_ids):
     """Подставляет имя клиента в более поздние звонки с того же номера, где имя не определено.
 
@@ -259,6 +293,10 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
         # Колонка эмоции реплик (для старых баз, где миграция еще не применялась)
         cursor.execute("ALTER TABLE call_text_sentiment_lines ADD COLUMN IF NOT EXISTS emotion VARCHAR(32);")
         conn.commit()
+        # Справочник филиалов и новые колонки звонков (город клиента, тип товара, юрлицо) — создаются автоматически
+        import branch_registry as breg
+        breg.ensure_schema(conn)
+        branches = breg.list_branches(cursor)
 
         cursor.execute("""
             SELECT 
@@ -269,7 +307,8 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 cs.customer_sentiment_start, cs.customer_sentiment_end, cs.satisfaction_score, cs.manager_politeness, cs.conflict_detected, cs.conflict_reason, cs.tone_summary,
                 t.sale_status, t.order_sum, t.has_upsell, t.upsell_sum, t.upsell_text, t.service_booking, t.service_date,
                 t.client_name, t.car_model, t.tire_brand, t.tire_size, t.tire_season, t.tire_count, t.branch_address, t.payment_method, t.lost_reason, t.call_summary,
-                t.call_category, t.call_subcategory, t.call_tags, t.checklist
+                t.call_category, t.call_subcategory, t.call_tags, t.checklist,
+                t.client_city, t.product_type, t.disc_size, t.is_legal_entity, t.company_name, t.client_bin
             FROM call_transcriptions t
             LEFT JOIN call_audio_features af ON t.id = af.call_id
             LEFT JOIN call_audio_emotions ae ON t.id = ae.call_id
@@ -405,6 +444,9 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             db_tire_season = r[42] if len(r) > 42 and r[42] else None
             db_tire_count = r[43] if len(r) > 43 and r[43] else None
             db_branch_address = r[44] if len(r) > 44 and r[44] else None
+            # Новые колонки добавлены в конец SELECT
+            db_client_city, db_product_type, db_disc_size, db_is_legal, db_company_name, db_client_bin = r[-6:]
+            branch_match = breg.match_branch(db_branch_address, branches) if db_branch_address else {"branch": None, "city": None, "how": "none"}
             db_payment_method = r[45] if len(r) > 45 and r[45] else None
             db_lost_reason = r[46] if len(r) > 46 and r[46] else None
             db_call_summary = r[47] if len(r) > 47 and r[47] else None
@@ -598,6 +640,20 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 "tireSeason": season_val,
                 "tireCount": db_tire_count or "4 шт.",
                 "branchAddress": db_branch_address or (f"г. {city_name}" if city_name else "Филиал Aikos"),
+                # Филиал из справочника: название, адрес, город (None, если название из звонка не сопоставилось)
+                "branch": ({k: branch_match["branch"][k] for k in ("id", "city", "name", "address")}
+                           if branch_match["branch"] else None),
+                "branchMatchedBy": branch_match["how"],
+                "branchCity": branch_match["city"] or city_name,
+                # Откуда звонит клиент — отдельно от города филиала (city)
+                "clientCity": db_client_city,
+                "productType": db_product_type,
+                "discSize": db_disc_size,
+                "isLegalEntity": db_is_legal,
+                "companyName": db_company_name,
+                "clientBin": db_client_bin,
+                "clientBinChecksumOk": breg.bin_checksum_ok(db_client_bin) if db_client_bin else None,
+                "clientProfileInherited": False,
                 "paymentMethod": db_payment_method or "Оплата при получении",
                 "lostReason": db_lost_reason or "",
                 "callSummary": db_call_summary or summary,
@@ -684,6 +740,7 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
         inherited = _inherit_client_names(calls, named_call_ids)
         if inherited:
             logging.info(f"[+] Имя клиента подставлено по номеру телефона в {inherited} звонков.")
+        _inherit_client_requisites(calls)
 
         conn.commit()
         cursor.close()

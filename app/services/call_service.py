@@ -37,8 +37,21 @@ def update_call_details(data: CallUpdateRequest) -> CallUpdateResponse:
     changed_by = data.changed_by.strip() or "Супервайзер"
     comment = data.comment.strip() or "Ручная корректировка данных"
 
+    # Новые поля: нормализуем до записи (пустое значение не затирает уже сохранённое)
+    import branch_registry as breg
+    product_type = breg.normalize_product_type(data.product_type)
+    client_city = breg.clean_text(data.client_city, 64)
+    disc_size = breg.clean_text(data.disc_size, 64)
+    company_name = breg.clean_text(data.company_name, 256)
+    client_bin = None
+    if data.client_bin is not None and data.client_bin.strip():
+        client_bin = breg.normalize_bin(data.client_bin)
+        if client_bin is None:
+            raise HTTPException(status_code=400, detail="БИН/ИИН должен состоять ровно из 12 цифр.")
+
     try:
         with get_db_connection() as conn:
+            breg.ensure_schema(conn)
             with conn.cursor() as cur:
                 # 0. Обеспечиваем наличие колонки unique_id в call_audit_logs
                 cur.execute("ALTER TABLE call_audit_logs ADD COLUMN IF NOT EXISTS unique_id VARCHAR(64);")
@@ -87,13 +100,22 @@ def update_call_details(data: CallUpdateRequest) -> CallUpdateResponse:
                         payment_method = COALESCE(%s, payment_method),
                         lost_reason = COALESCE(%s, lost_reason),
                         call_category = COALESCE(%s, call_category),
-                        call_subcategory = COALESCE(%s, call_subcategory)
+                        call_subcategory = COALESCE(%s, call_subcategory),
+                        client_city = COALESCE(%s, client_city),
+                        product_type = COALESCE(%s, product_type),
+                        disc_size = COALESCE(%s, disc_size),
+                        is_legal_entity = COALESCE(%s, is_legal_entity),
+                        company_name = COALESCE(%s, company_name),
+                        client_bin = COALESCE(%s, client_bin)
                     WHERE id = %s;
                 """, (
                     new_manager, new_city, sale_status, order_sum, has_upsell, upsell_sum, upsell_text, service_booking, service_date,
                     data.client_name, data.car_model, data.tire_brand, data.tire_size, data.tire_season, data.tire_count,
                     data.branch_address, data.payment_method, data.lost_reason,
                     data.call_category, data.call_subcategory,
+                    client_city, product_type, disc_size,
+                    True if (client_bin or company_name) else data.is_legal_entity,
+                    company_name, client_bin,
                     call_id
                 ))
 

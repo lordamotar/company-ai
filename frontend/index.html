@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css?v=3.0">
     <link rel="stylesheet" href="manager_analysis.css?v=1.1">
+    <link rel="stylesheet" href="branches.css?v=1.0">
 </head>
 <body>
     <div class="app-container">
@@ -60,6 +61,11 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                     <span>Журнал изменений</span>
                     <span class="badge-count" id="totalAuditBadge">0</span>
+                </a>
+                <a href="#branches" class="nav-item" data-view="view-branches" data-title="Филиалы">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                    <span>Филиалы</span>
+                    <span class="badge-count" id="totalBranchesBadge">0</span>
                 </a>
             </nav>
 
@@ -559,6 +565,64 @@
                     </div>
                 </section>
             </div>
+
+            <!-- ЭКРАН 6: СПРАВОЧНИК ФИЛИАЛОВ (НАСТРОЙКИ) -->
+            <div id="view-branches" class="page-view">
+                <section class="card br-intro">
+                    <p>Справочник нужен, чтобы разные написания одного филиала из звонков («Красный пахарь», «Красный Пильщик») сводились к одному филиалу с городом и адресом.
+                    Пополняйте его в любой момент: звонки сопоставляются при каждой загрузке, повторный анализ не нужен.
+                    Если в названии звонка встречается город, ищется филиал именно этого города.</p>
+                </section>
+
+                <section class="card br-form-card">
+                    <h3 id="brFormTitle">Добавить филиал</h3>
+                    <form id="brForm" autocomplete="off">
+                        <div class="br-form-grid">
+                            <label>Город
+                                <input type="text" id="brCity" list="brCityList" maxlength="64" required placeholder="Например: Семей">
+                                <datalist id="brCityList"></datalist>
+                            </label>
+                            <label>Название филиала
+                                <input type="text" id="brName" maxlength="128" required placeholder="Например: Красный пахарь">
+                            </label>
+                            <label>Адрес
+                                <input type="text" id="brAddress" maxlength="256" placeholder="Улица, дом или ориентир">
+                            </label>
+                            <label>Другие написания (через запятую)
+                                <input type="text" id="brAliases" placeholder="Красный Пильщик, Красный пахарь Семей">
+                            </label>
+                        </div>
+                        <div class="br-form-actions">
+                            <button type="submit" class="btn btn-primary" id="brSaveBtn">Добавить</button>
+                            <button type="button" class="btn btn-secondary" id="brCancelBtn" style="display: none;">Отмена</button>
+                            <span id="brMessage" class="br-message"></span>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="table-container">
+                    <table class="crm-table">
+                        <thead>
+                            <tr>
+                                <th>Город</th>
+                                <th>Название</th>
+                                <th>Адрес</th>
+                                <th>Другие написания</th>
+                                <th>Звонков</th>
+                                <th class="text-right">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="brTableBody"></tbody>
+                    </table>
+                </section>
+
+                <section class="card" id="brUnmatchedCard">
+                    <h3>Названия из звонков без филиала <span class="br-count" id="brUnmatchedCount">0</span></h3>
+                    <p class="br-hint">Эти написания встречаются в звонках, но не совпали ни с одним филиалом. Создайте по ним новый филиал или добавьте как другое написание существующего.</p>
+                    <div id="brUnmatchedList"></div>
+                    <p class="br-hint" id="brSkippedNote"></p>
+                </section>
+            </div>
         </main>
     </div>
 
@@ -670,11 +734,19 @@
                                     <span class="fact-val" id="modalCarModel">—</span>
                                 </div>
                                 <div class="fact-item">
-                                    <span class="fact-label">Город / Филиал</span>
-                                    <span class="fact-val" id="modalCity">Алматы</span>
+                                    <span class="fact-label">Клиент из города</span>
+                                    <span class="fact-val" id="modalClientCity">—</span>
                                 </div>
                                 <div class="fact-item">
-                                    <span class="fact-label">Товар / Сезон</span>
+                                    <span class="fact-label">Филиал для брони</span>
+                                    <span class="fact-val" id="modalCity">Алматы</span>
+                                </div>
+                                <div class="fact-item" id="modalLegalWrap" style="display: none;">
+                                    <span class="fact-label">Юрлицо (компания / БИН)</span>
+                                    <span class="fact-val highlight" id="modalLegal">—</span>
+                                </div>
+                                <div class="fact-item">
+                                    <span class="fact-label">Товар</span>
                                     <span class="fact-val" id="modalProductCat">Зимние шины</span>
                                 </div>
                                 <div class="fact-item">
@@ -682,8 +754,12 @@
                                     <span class="fact-val highlight" id="modalTireBrand">—</span>
                                 </div>
                                 <div class="fact-item">
-                                    <span class="fact-label">Типоразмер</span>
+                                    <span class="fact-label" id="modalTireSizeLabel">Типоразмер</span>
                                     <span class="fact-val highlight" id="modalTireSize">—</span>
+                                </div>
+                                <div class="fact-item" id="modalDiscSizeWrap" style="display: none;">
+                                    <span class="fact-label">Размер диска</span>
+                                    <span class="fact-val highlight" id="modalDiscSize">—</span>
                                 </div>
                                 <div class="fact-item">
                                     <span class="fact-label">Количество</span>
@@ -1230,7 +1306,7 @@
 
                 <div class="form-group">
                     <label style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">
-                        Город / Филиал:
+                        Город филиала (где бронь / самовывоз):
                     </label>
                     <div style="display: flex; gap: 8px;">
                         <select id="editCitySelect" class="filter-select" style="flex: 1;">
@@ -1247,6 +1323,27 @@
                             <option value="custom">✏️ Другой город...</option>
                         </select>
                         <input type="text" id="editCityCustom" placeholder="Введите город..." style="display: none; flex: 1; background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; color: #fff;">
+                    </div>
+                </div>
+
+                <!-- Клиент и товар -->
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--text-primary);">👤 Клиент и товар <span style="font-weight: 400; font-size: 11.5px; color: var(--text-secondary);">(пустое поле не меняет сохранённое значение)</span></div>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="editClientCity" placeholder="Город клиента (откуда звонит)" maxlength="64" style="flex: 1; background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; color: var(--text-primary); font-size: 13px;">
+                        <select id="editProductType" class="filter-select" style="flex: 1;">
+                            <option value="">Товар: не менять</option>
+                            <option value="Шины">Шины</option>
+                            <option value="Диски">Диски</option>
+                            <option value="Шины и диски">Шины и диски</option>
+                            <option value="Услуга">Услуга</option>
+                            <option value="Другое">Другое</option>
+                        </select>
+                    </div>
+                    <input type="text" id="editDiscSize" placeholder="Размер диска (например 22.5x9.00)" maxlength="64" style="width: 100%; background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; color: var(--text-primary); font-size: 13px;">
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="editCompanyName" placeholder="Компания (если юрлицо)" maxlength="256" style="flex: 1.4; background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; color: var(--text-primary); font-size: 13px;">
+                        <input type="text" id="editClientBin" placeholder="БИН / ИИН, 12 цифр" maxlength="17" inputmode="numeric" style="flex: 1; background: var(--bg-card); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; color: var(--text-primary); font-size: 13px;">
                     </div>
                 </div>
 
@@ -1330,7 +1427,8 @@
         </div>
     </div>
 
-    <script src="app.js?v=4.2"></script>
+    <script src="app.js?v=4.3"></script>
     <script src="manager_analysis.js?v=1.2"></script>
+    <script src="branches.js?v=1.0"></script>
 </body>
 </html>
