@@ -1,6 +1,3 @@
-include:
-  - path: ./datalens/docker-compose.yaml
-
 services:
 
   postgres:
