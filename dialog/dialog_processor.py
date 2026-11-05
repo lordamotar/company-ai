@@ -30,9 +30,19 @@ logging.basicConfig(
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DIALOG_DIR = os.path.join(BASE_DIR, "dialog")
+DIALOG_DIR = BASE_DIR   # скрипт лежит в самой папке dialog/
 OUTPUT_JSON_PATH = os.path.join(DIALOG_DIR, "dialogs_data.json")
 DASHBOARD_HTML_PATH = os.path.join(DIALOG_DIR, "dashboard.html")
+INPUT_DIR = os.path.join(DIALOG_DIR, "input")   # сюда кладутся CSV-выгрузки Bitrix24
+# Chart.js встраивается в дашборд: страница открывается без интернета и никуда не обращается
+CHART_JS_PATH = os.path.join(BASE_DIR, "vendor", "chart.umd.min.js")
+# Отчёт контроля качества по менеджеру (скачивание HTML / копирование текста), тоже встраивается в дашборд
+REPORT_JS_PATH = os.path.join(BASE_DIR, "dialog_report.js")
+
+from dialog_manager_quality import analyze_manager, manager_name, CHECKLIST
+
+sys.path.insert(0, os.path.dirname(BASE_DIR))   # tire_sizes.py — в корне проекта, общий со звонками
+from tire_sizes import _metric as _metric_tire_size
 
 # Справочники для извлечения сущностей
 CITIES = [
@@ -131,10 +141,12 @@ def extract_tire_sizes(text):
     for m in matches:
         clean = re.sub(r'[\s\-xX]', '/', m)
         clean = re.sub(r'/+R?', '/', clean, flags=re.I)
-        parts = clean.split('/')
+        parts = [p for p in clean.split('/') if p]
         if len(parts) >= 3 and len(parts[0]) == 3 and len(parts[1]) == 2:
-            std_size = f"{parts[0]}/{parts[1]} R{parts[2]}"
-            sizes.add(std_size)
+            # Только физически возможные шины: номера телефонов, заказов и артикулы («051/15 R47») отбрасываются
+            std_size = _metric_tire_size(parts[0], parts[1], parts[2])
+            if std_size:
+                sizes.add(std_size)
 
     # Диски одиночные: Р 17, R18, R16
     if not sizes:
@@ -175,10 +187,15 @@ def extract_product_category(text, tire_sizes, brands):
         return "Шины (Общее)"
     return "Общая консультация"
 
-def extract_intents(text):
+def extract_intents(text, messages=None):
     """Определяет ключевые вопросы и намерения клиента."""
     text_lower = text.lower()
     intents = []
+
+    # Kaspi — по словам клиента: бот сам часто предлагает Kaspi, это не вопрос клиента
+    client_text = " ".join(m["text"] for m in (messages or []) if m["role"] == "client").lower()
+    if re.search(r'каспи|kaspi', client_text):
+        intents.append("Kaspi: заказ / оплата / рассрочка")
     
     if any(w in text_lower for w in ["наличи", "есть в", "остаток", "склад", "в наличии"]):
         intents.append("Наличие на складе")
@@ -221,7 +238,10 @@ def extract_source(text, messages, row):
         return "Instagram"
     if re.search(r'на\s+сайте|с\s+сайта|в\s+интернет[- ]магазине|заказ\s+с\s+сайта|нашел\s+на\s+сайте|корзин[ае]\s+на\s+сайте|aikos\.kz', client_text):
         return "Сайт Aikos.kz"
-    if re.search(r'в\s+каспи|из\s+каспи|каспи\s+магазин|в\s+магазине\s+каспи', client_text):
+    # Kaspi — источник, только если клиент увидел/нашёл товар там. «Купить/заказать/рассрочка через Kaspi» — это тема
+    # обращения (extract_intents), а не источник.
+    if re.search(r'(увидел|нашел|нашёл|нашла|видел|смотрел|посмотрел)\w*[^.!?\n]{0,30}(в|на)\s+(каспи|kaspi)'
+                 r'|(в|на)\s+(каспи|kaspi)\w*[^.!?\n]{0,30}(увидел|нашел|нашёл|нашла|видел|смотрел)', client_text):
         return "Kaspi Магазин"
     if re.search(r'посоветова(?:л|ли)|по\s+рекомендаци|знакомы(?:й|е)\s+посоветова|брат\s+дал\s+номер|друг\s+посоветова', client_text):
         return "Рекомендация"
@@ -334,13 +354,17 @@ def process_csv_file(csv_path, existing_sids=None):
             messages = parse_dialog_messages(raw_text)
 
             # Проверка участия оператора
+            # Подпись менеджера: короткое имя и реальный человек за учётной записью (ACCOUNT_TO_MANAGER)
+            for m in messages:
+                if m["role"] == "operator":
+                    m["sender"] = manager_name(m["sender"])
             operator_messages = [m for m in messages if m["role"] == "operator"]
             bot_messages = [m for m in messages if m["role"] == "bot"]
             client_messages = [m for m in messages if m["role"] == "client"]
             
             operator_present = len(operator_messages) > 0
             operator_name = operator_messages[0]["sender"] if operator_present else (
-                assigned_employee if assigned_employee and assigned_employee != "AI ассистент" else "Только AI-бот"
+                manager_name(assigned_employee) if assigned_employee and assigned_employee != "AI ассистент" else "Только AI-бот"
             )
             
             # Извлечение аналитических признаков
@@ -349,7 +373,7 @@ def process_csv_file(csv_path, existing_sids=None):
             brands = extract_brands(raw_text)
             car_model = extract_car_model(raw_text)
             category = extract_product_category(raw_text, tire_sizes, brands)
-            intents = extract_intents(raw_text)
+            intents = extract_intents(raw_text, messages)
             source = extract_source(raw_text, messages, row)
             outcome_label, outcome_type = extract_detailed_outcome(raw_text, messages, row, operator_present)
 
@@ -392,7 +416,8 @@ def process_csv_file(csv_path, existing_sids=None):
                 "isSale": outcome_type == "sale",
                 "isService": outcome_type == "service",
                 "rawTextSnippet": raw_text[:300] + "..." if len(raw_text) > 300 else raw_text,
-                "messages": messages
+                "messages": messages,
+                "mgr": analyze_manager(messages, assigned_employee),
             })
             existing_sids.add(sid)
 
@@ -540,17 +565,14 @@ def compute_aggregates(dialogs):
 
 def generate_dashboard_html(data=None):
     """Генерирует автономный интерактивный дашборд аналитики диалогов с поддержкой источников и конверсий."""
-    embedded_json = json.dumps(data, ensure_ascii=False) if data else "null"
+    embedded_json = json.dumps(data, ensure_ascii=False).replace("</", "<\\/") if data else "null"
     html_content = f"""<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIKOS Intelligence — Аналитика диалогов Bitrix24 WhatsApp</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>__CHART_JS__</script>
     <style>
         :root {{
             --bg-base: #0c0f17;
@@ -577,7 +599,7 @@ def generate_dashboard_html(data=None):
             --shadow-glow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }}
 
-        * {{ margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }}
+        * {{ margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif; }}
         body {{ background: var(--bg-base); color: var(--text-main); min-height: 100vh; overflow-x: hidden; }}
 
         /* Шапка */
@@ -612,7 +634,7 @@ def generate_dashboard_html(data=None):
         .badge-live::before {{ content: ""; width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981; }}
 
         /* Контейнер */
-        .container {{ max-width: 1560px; margin: 0 auto; padding: 24px 32px 60px; }}
+        .container {{ width: 100%; padding: 24px 32px 60px; }}   /* на всю ширину окна, как шапка */
 
         /* Сетка KPI карточек */
         .kpi-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }}
@@ -692,14 +714,26 @@ def generate_dashboard_html(data=None):
             background: var(--bg-card); border: 1px solid var(--border-color);
             border-radius: var(--radius-md); overflow-x: auto; backdrop-filter: blur(12px);
         }}
-        .custom-table {{ width: 100%; border-collapse: collapse; text-align: left; min-width: 1200px; }}
+        /* Таблицы помещаются по ширине экрана: без минимальной ширины, текст и бейджи переносятся */
+        .custom-table {{ width: 100%; border-collapse: collapse; text-align: left; }}
+        .custom-table .badge {{ white-space: normal; }}
+        .custom-table th.sortable {{ cursor: pointer; user-select: none; }}
+        .custom-table th.sortable:hover {{ color: var(--text-main); }}
+        .custom-table th.sorted-asc::after {{ content: " ▲"; color: #38bdf8; }}
+        .custom-table th.sorted-desc::after {{ content: " ▼"; color: #38bdf8; }}
+        @media (max-width: 1400px) {{
+            .custom-table td {{ overflow-wrap: anywhere; }}
+            .custom-table th {{ letter-spacing: 0; padding: 10px 6px; }}
+            .custom-table td {{ padding: 8px 6px; }}
+            .custom-table .badge {{ padding: 3px 6px; font-size: 10px; letter-spacing: 0; }}
+        }}
         .custom-table th {{
-            background: rgba(0, 0, 0, 0.35); padding: 14px 16px; font-size: 11.5px;
+            background: rgba(0, 0, 0, 0.35); padding: 12px 8px; font-size: 11px;
             text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;
             border-bottom: 1px solid var(--border-color);
         }}
         .custom-table td {{
-            padding: 14px 16px; font-size: 13px; border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 10px 8px; font-size: 12.5px; overflow-wrap: break-word; border-bottom: 1px solid rgba(255, 255, 255, 0.04);
             vertical-align: middle;
         }}
         .custom-table tr:hover td {{ background: rgba(255, 255, 255, 0.03); cursor: pointer; }}
@@ -921,6 +955,29 @@ def generate_dashboard_html(data=None):
         </div>
     </div>
 
+    <!-- Качество работы менеджеров -->
+    <div class="table-card" style="margin-bottom: 28px;">
+        <div style="padding: 18px 20px 10px;">
+            <h3 style="font-size: 15px; font-weight: 700;">👨‍💼 Качество работы менеджеров</h3>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+                Оценка по правилам, без ИИ: чек-лист из 6 пунктов по тексту ответов менеджера (0–100).
+                Время ответа — в рабочих минутах (9:00–20:00): от фразы бота «передаю менеджеру» или от вопроса клиента,
+                на который бот не ответил. «Без ответа» — последнее содержательное сообщение клиента осталось без реплики менеджера.
+                Учитывает фильтры ниже. Нажмите на строку менеджера или выберите его в списке — откроется разбор его ответов.
+            </div>
+            <div style="margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <span style="font-size: 13px; font-weight: 600;">🔍 Разбор менеджера:</span>
+                <select id="mgrDetailSelect" class="select-filter"><option value="">— выберите менеджера —</option></select>
+            </div>
+        </div>
+        <table class="custom-table">
+            <thead><tr id="mgrQualityHead"></tr></thead>
+            <tbody id="mgrQualityBody"></tbody>
+        </table>
+        <div id="mgrNoReply" style="padding: 12px 20px; font-size: 13px; color: #fbbf24;"></div>
+        <div id="mgrDetail"></div>
+    </div>
+
     <!-- Фильтры -->
     <div class="filter-panel">
         <div class="filter-group">
@@ -949,6 +1006,9 @@ def generate_dashboard_html(data=None):
                 <option value="in_progress">⏳ В работе</option>
                 <option value="lost">❌ Отказы / Ушли</option>
                 <option value="bot">🤖 Только AI-бот</option>
+                <option value="mgr_unanswered">⚠️ Клиент остался без ответа</option>
+                <option value="mgr_noreply">⏰ Передан менеджеру, ответа нет</option>
+                <option value="mgr_slow">🐢 Долгий первый ответ</option>
             </select>
 
             <select id="cityFilter" class="select-filter">
@@ -973,27 +1033,40 @@ def generate_dashboard_html(data=None):
         <table class="custom-table">
             <thead>
                 <tr>
-                    <th>SID / Дата</th>
-                    <th>Клиент</th>
-                    <th>Источник</th>
-                    <th>Город</th>
-                    <th>Категория</th>
-                    <th>Типоразмер</th>
-                    <th>Бренд / Авто</th>
-                    <th>Менеджер</th>
-                    <th>Результат / Исход</th>
-                    <th>Тема</th>
-                    <th>Сообщений</th>
+                    <th class="sortable" data-sort="createdAt" onclick="sortDialogsBy('createdAt')">SID / Дата</th>
+                    <th class="sortable" data-sort="client" onclick="sortDialogsBy('client')">Клиент</th>
+                    <th class="sortable" data-sort="source" onclick="sortDialogsBy('source')">Источник</th>
+                    <th class="sortable" data-sort="city" onclick="sortDialogsBy('city')">Город</th>
+                    <th class="sortable" data-sort="category" onclick="sortDialogsBy('category')">Категория</th>
+                    <th class="sortable" data-sort="size" onclick="sortDialogsBy('size')">Размер</th>
+                    <th class="sortable" data-sort="brand" onclick="sortDialogsBy('brand')">Бренд</th>
+                    <th class="sortable" data-sort="car" onclick="sortDialogsBy('car')">Авто</th>
+                    <th class="sortable" data-sort="operator" onclick="sortDialogsBy('operator')">Менеджер</th>
+                    <th class="sortable" data-sort="score" onclick="sortDialogsBy('score')">Оценка</th>
+                    <th class="sortable" data-sort="outcome" onclick="sortDialogsBy('outcome')">Исход</th>
+                    <th class="sortable" data-sort="intent" onclick="sortDialogsBy('intent')">Тема</th>
+                    <th class="sortable" data-sort="messages" onclick="sortDialogsBy('messages')" title="Сообщений в диалоге">Сообщ.</th>
                 </tr>
             </thead>
             <tbody id="dialogsTableBody">
-                <tr><td colspan="11" style="text-align:center; padding: 40px; color: var(--text-muted);">Загрузка аналитики диалогов...</td></tr>
+                <tr><td colspan="13" style="text-align:center; padding: 40px; color: var(--text-muted);">Загрузка аналитики диалогов...</td></tr>
             </tbody>
         </table>
         
         <!-- Пагинация -->
         <div class="pagination-bar" id="paginationBar" style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; background:rgba(0,0,0,0.25); border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;">
-            <div style="font-size:13px; color:var(--text-muted);" id="pageInfo">Показано 1–50 из 0</div>
+            <div style="display:flex; gap:12px; align-items:center; font-size:13px; color:var(--text-muted);">
+                <span id="pageInfo">Показано 1–50 из 0</span>
+                <label>Записей на странице:
+                    <select id="pageSizeSelect" class="select-filter" style="padding:4px 8px;" onchange="changePageSize(this.value)">
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                        <option value="1000000">Все</option>
+                    </select>
+                </label>
+            </div>
             <div style="display:flex; gap:6px; align-items:center;">
                 <button id="prevPageBtn" class="btn-page" onclick="changePage(-1)">← Назад</button>
                 <div id="pageNumbers" style="display:flex; gap:4px;"></div>
@@ -1014,7 +1087,10 @@ def generate_dashboard_html(data=None):
                     <p id="modalSubInfo">Караганда • 2GIS • Зимние шины</p>
                 </div>
             </div>
-            <button class="close-btn" onclick="closeChatModal()">✕</button>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <button id="botToggleBtn" class="btn-reset" onclick="toggleBotMessages()" title="Показать только клиента и менеджера">🤖 Скрыть ответы ИИ</button>
+                <button class="close-btn" onclick="closeChatModal()">✕</button>
+            </div>
         </div>
         <div class="session-nav-bar" id="modalSessionNav"></div>
         <div class="chat-body" id="chatBody"></div>
@@ -1044,14 +1120,17 @@ async function initDashboard() {{
         allDialogs = rawData.dialogs || [];
         
         renderKPIs(rawData.aggregates.summary);
+        renderManagerQuality(allDialogs);
         initCharts(rawData.aggregates.charts);
         populateFilters(rawData.aggregates.charts);
         populateDatePresets(allDialogs);
         renderTable(allDialogs);
+        populateMgrDetailSelect();
+        document.getElementById("pageSizeSelect").value = String(pageSize);
         setupEventListeners();
     }} catch (err) {{
         console.error("Ошибка загрузки:", err);
-        document.getElementById("dialogsTableBody").innerHTML = `<tr><td colspan="11" style="text-align:center; padding: 40px; color:#f43f5e;">Ошибка загрузки данных: ${{err.message}}</td></tr>`;
+        document.getElementById("dialogsTableBody").innerHTML = `<tr><td colspan="13" style="text-align:center; padding: 40px; color:#f43f5e;">Ошибка загрузки данных: ${{err.message}}</td></tr>`;
     }}
 }}
 
@@ -1502,11 +1581,19 @@ function updateChartsData(agg) {{
 }}
 
 let currentPage = 1;
-const pageSize = 50;
+let pageSize = 50;
+try {{ pageSize = Number(localStorage.getItem("dialogsPageSize")) || 50; }} catch (e) {{}}
+
+function changePageSize(value) {{
+    pageSize = Number(value);
+    try {{ localStorage.setItem("dialogsPageSize", value); }} catch (e) {{}}
+    currentPage = 1;
+    renderCurrentPage();
+}}
 let currentFilteredDialogs = [];
 
 function renderTable(dialogs) {{
-    currentFilteredDialogs = dialogs;
+    currentFilteredDialogs = sortDialogs(dialogs);
     currentPage = 1;
     document.getElementById("counterLabel").innerText = `Найдено: ${{dialogs.length}}`;
     renderCurrentPage();
@@ -1517,7 +1604,7 @@ function renderCurrentPage() {{
     const total = currentFilteredDialogs.length;
 
     if (total === 0) {{
-        tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding: 40px; color: var(--text-muted);">Диалоги по выбранным фильтрам не найдены.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding: 40px; color: var(--text-muted);">Диалоги по выбранным фильтрам не найдены.</td></tr>`;
         document.getElementById("pageInfo").innerText = "Нет записей";
         document.getElementById("pageNumbers").innerHTML = "";
         document.getElementById("prevPageBtn").disabled = true;
@@ -1548,14 +1635,12 @@ function renderCurrentPage() {{
             <td><span class="badge badge-city">${{d.city}}</span></td>
             <td><span class="badge" style="background:rgba(255,255,255,0.08);">${{d.category}}</span></td>
             <td>${{d.primarySize !== "—" ? `<span class="badge badge-size">${{d.primarySize}}</span>` : `<span style="color:var(--text-muted);">—</span>`}}</td>
-            <td>
-                ${{d.primaryBrand !== "—" ? `<span class="badge badge-brand">${{d.primaryBrand}}</span>` : ""}}
-                ${{d.carModel !== "—" ? `<div style="font-size:11px; color:#cbd5e1; margin-top:2px;">🚗 ${{d.carModel}}</div>` : ""}}
-                ${{d.primaryBrand === "—" && d.carModel === "—" ? `<span style="color:var(--text-muted);">—</span>` : ""}}
-            </td>
+            <td>${{d.primaryBrand !== "—" ? `<span class="badge badge-brand">${{d.primaryBrand}}</span>` : `<span style="color:var(--text-muted);">—</span>`}}</td>
+            <td>${{d.carModel !== "—" ? `<span style="font-size:12px; color:#cbd5e1;">🚗 ${{d.carModel}}</span>` : `<span style="color:var(--text-muted);">—</span>`}}</td>
             <td>
                 ${{d.operatorPresent ? `<span class="badge badge-op">👨‍💼 ${{d.operator}}</span>` : `<span class="badge badge-bot">🤖 AI-бот</span>`}}
             </td>
+            <td>${{mgrScoreHtml(d.mgr)}}</td>
             <td>${{getOutcomeBadgeHtml(d.outcome, d.isSale, d.isService)}}</td>
             <td><span style="font-size:12px; color:var(--text-muted);">${{d.primaryIntent}}</span></td>
             <td style="font-weight:700; text-align:center;">${{d.messagesCount}}</td>
@@ -1636,6 +1721,9 @@ function setupEventListeners() {{
                 if (selOutcome === "in_progress" && d.outcomeType !== "in_progress") return false;
                 if (selOutcome === "lost" && d.outcomeType !== "lost") return false;
                 if (selOutcome === "bot" && d.operatorPresent) return false;
+                if (selOutcome === "mgr_unanswered" && !(d.mgr && d.mgr.unanswered)) return false;
+                if (selOutcome === "mgr_noreply" && !(d.mgr && d.mgr.noReply)) return false;
+                if (selOutcome === "mgr_slow" && !(d.mgr && d.mgr.firstResponseMin > MGR_SLOW_MIN)) return false;
             }}
 
             if (selCity && d.city !== selCity) return false;
@@ -1662,8 +1750,10 @@ function setupEventListeners() {{
 
         const agg = computeFilteredAggregates(filtered);
         renderKPIs(agg.summary);
+        renderManagerQuality(filtered);
         updateChartsData(agg);
         renderTable(filtered);
+        renderManagerDetail();
     }}
 
     datePreset.addEventListener("change", () => {{
@@ -1769,6 +1859,7 @@ function switchModalSession(targetSid) {{
 }}
 
 function renderModalBody(activeDialog) {{
+    currentModalDialog = activeDialog;
     const sessionsToRender = currentActiveSessionSid === 'all'
         ? currentModalSessions
         : currentModalSessions.filter(s => s.sid === currentActiveSessionSid);
@@ -1794,7 +1885,7 @@ function renderModalBody(activeDialog) {{
             ${{activeDialog.primarySize && activeDialog.primarySize !== '—' ? `<span>• 🛞 ${{activeDialog.primarySize}}</span>` : ''}}
         `;
         document.getElementById("modalMetaLeft").innerText = `SID: #${{activeDialog.sid}} | Начало: ${{activeDialog.createdAt}} | Длительность: ${{activeDialog.durationMin}} мин`;
-        document.getElementById("modalMetaRight").innerText = activeDialog.operatorPresent ? `👨‍💼 Менеджер: ${{activeDialog.operator}}` : `🤖 AI-бот`;
+        document.getElementById("modalMetaRight").innerHTML = mgrDetailsHtml(activeDialog);
     }}
 
     const chatBody = document.getElementById("chatBody");
@@ -1821,7 +1912,7 @@ function renderModalBody(activeDialog) {{
         }}
 
         if (sess.messages && sess.messages.length > 0) {{
-            fullHtml += sess.messages.map(m => {{
+            fullHtml += sess.messages.filter(m => !(hideBotMessages && m.role === "bot")).map(m => {{
                 let roleClass = "bubble-client";
                 let roleLabel = "Клиент";
                 if (m.role === "bot") {{ roleClass = "bubble-bot"; roleLabel = "AI Бот"; }}
@@ -1844,15 +1935,300 @@ function renderModalBody(activeDialog) {{
     chatBody.scrollTop = chatBody.scrollHeight;
 }}
 
+const MGR_SLOW_MIN = 30;
+
+function scoreColor(score) {{
+    return score >= 67 ? "#34d399" : score >= 34 ? "#fbbf24" : "#f43f5e";
+}}
+
+function median(values) {{
+    if (!values.length) return null;
+    const v = [...values].sort((a, b) => a - b), mid = Math.floor(v.length / 2);
+    return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
+}}
+
+function fmtMin(value) {{
+    if (value === null || value === undefined) return "—";
+    return value >= 60 ? `${{Math.floor(value / 60)}} ч ${{Math.round(value % 60)}} мин` : `${{Math.round(value)}} мин`;
+}}
+
+function mgrScoreHtml(mgr) {{
+    if (!mgr) return `<span style="color:var(--text-muted);">—</span>`;
+    if (mgr.noReply) return `<span class="badge" style="background:rgba(244,63,94,0.15); color:#f43f5e;" title="Бот передал диалог менеджеру, ответа не было">нет ответа</span>`;
+    const flags = (mgr.flags || []).join("\\n");
+    return `<span class="badge" style="background:rgba(255,255,255,0.06); color:${{scoreColor(mgr.score)}}; font-weight:700;" title="${{flags}}">${{mgr.score}}</span>`
+        + (mgr.flags && mgr.flags.length ? ` <span title="${{flags}}">⚠️</span>` : "");
+}}
+
+function mgrDetailsHtml(d) {{
+    const mgr = d.mgr;
+    if (!mgr) return d.operatorPresent ? `👨‍💼 Менеджер: ${{d.operator}}` : `🤖 AI-бот`;
+    if (mgr.noReply) return `⏰ Передан менеджеру (${{mgr.name}}) в ${{mgr.handoffAt}}, ответа не было`;
+    const checks = (rawData.managerChecklist || []).map(([key, label]) =>
+        `<span style="margin-left:8px; color:${{mgr.checks[key] ? '#34d399' : '#f43f5e'}};">${{mgr.checks[key] ? '✓' : '✗'}} ${{label}}</span>`).join("");
+    return `👨‍💼 ${{mgr.name}} • оценка <b style="color:${{scoreColor(mgr.score)}}">${{mgr.score}}</b> • 1-й ответ ${{fmtMin(mgr.firstResponseMin)}}`
+        + `<div style="margin-top:4px;">${{checks}}</div>`
+        + (mgr.flags.length ? `<div style="margin-top:4px; color:#fbbf24;">⚠️ ${{mgr.flags.join(" • ")}}</div>` : "");
+}}
+
+// ---- Сортировка по щелчку на заголовок ----
+// Пустые значения («—») всегда в конце, числа сравниваются как числа, текст — по-русски.
+function compareValues(x, y, dir) {{
+    const empty = v => v === null || v === undefined || v === "" || v === "—";
+    if (empty(x) && empty(y)) return 0;
+    if (empty(x)) return 1;
+    if (empty(y)) return -1;
+    if (typeof x === "number" && typeof y === "number") return (x - y) * dir;
+    return String(x).localeCompare(String(y), "ru", {{ numeric: true }}) * dir;
+}}
+
+let qualitySort = {{ col: null, dir: 1 }};
+
+function sortQuality(col) {{
+    qualitySort = {{ col, dir: qualitySort.col === col ? -qualitySort.dir : (col === 0 ? 1 : -1) }};
+    renderManagerQuality(currentFilteredDialogs);
+}}
+
+function applyQualitySort() {{
+    if (qualitySort.col === null) return;
+    const body = document.getElementById("mgrQualityBody");
+    const value = row => {{
+        const v = row.cells[qualitySort.col] ? row.cells[qualitySort.col].dataset.v : "";
+        return v !== "" && v !== undefined && !isNaN(v) ? Number(v) : v;
+    }};
+    [...body.rows].sort((a, b) => compareValues(value(a), value(b), qualitySort.dir)).forEach(r => body.appendChild(r));
+}}
+
+const DIALOG_SORT = {{
+    createdAt: d => d.createdAt || "",
+    client: d => d.client,
+    source: d => d.source,
+    city: d => d.city === "Не определен" ? "" : d.city,
+    category: d => d.category,
+    size: d => d.primarySize,
+    brand: d => d.primaryBrand,
+    car: d => d.carModel,
+    operator: d => d.operatorPresent ? d.operator : "",
+    score: d => d.mgr ? (d.mgr.noReply ? -1 : d.mgr.score) : null,
+    outcome: d => d.outcome,
+    intent: d => d.primaryIntent,
+    messages: d => d.messagesCount || 0,
+}};
+let dialogSort = {{ key: null, dir: 1 }};
+
+function sortDialogsBy(key) {{
+    // Первый щелчок: даты и числа — по убыванию, текст — по алфавиту
+    const firstDir = ["createdAt", "score", "messages"].includes(key) ? -1 : 1;
+    dialogSort = {{ key, dir: dialogSort.key === key ? -dialogSort.dir : firstDir }};
+    document.querySelectorAll("th[data-sort]").forEach(th => {{
+        th.classList.remove("sorted-asc", "sorted-desc");
+        if (th.dataset.sort === key) th.classList.add(dialogSort.dir > 0 ? "sorted-asc" : "sorted-desc");
+    }});
+    renderTable(currentFilteredDialogs);
+}}
+
+function sortDialogs(list) {{
+    if (!dialogSort.key) return list;
+    const get = DIALOG_SORT[dialogSort.key];
+    return [...list].sort((a, b) => compareValues(get(a), get(b), dialogSort.dir));
+}}
+
+function renderManagerQuality(dialogs) {{
+    const checklist = rawData.managerChecklist || [];
+    document.getElementById("mgrQualityHead").innerHTML = ["Менеджер", "Диалогов", "Оценка", "1-й ответ (медиана)",
+        "Ответ (медиана)", "Без ответа", ...checklist.map(c => c[1]), "Продажи + сервис"]
+        .map((h, i) => `<th class="sortable${{qualitySort.col === i ? (qualitySort.dir > 0 ? ' sorted-asc' : ' sorted-desc') : ''}}" onclick="sortQuality(${{i}})">${{h}}</th>`).join("");
+
+    const groups = {{}}, noReply = {{}};
+    dialogs.forEach(d => {{
+        if (!d.mgr) return;
+        if (d.mgr.noReply) {{ noReply[d.mgr.name] = (noReply[d.mgr.name] || 0) + 1; return; }}
+        (groups[d.mgr.name] = groups[d.mgr.name] || []).push(d);
+    }});
+    const pct = (n, total) => total ? Math.round(n * 100 / total) : 0;
+    const rows = Object.entries(groups).sort((a, b) => b[1].length - a[1].length).map(([name, items]) => {{
+        const n = items.length;
+        const score = Math.round(items.reduce((s, d) => s + d.mgr.score, 0) / n);
+        const first = median(items.map(d => d.mgr.firstResponseMin).filter(v => v !== null && v !== undefined));
+        const avg = median(items.map(d => d.mgr.avgResponseMin).filter(v => v !== null && v !== undefined));
+        const unanswered = items.filter(d => d.mgr.unanswered).length;
+        const conv = items.filter(d => d.isSale || d.isService).length;
+        const cells = checklist.map(([key]) => {{
+            const p = pct(items.filter(d => d.mgr.checks[key]).length, n);
+            return `<td data-v="${{p}}" style="color:${{scoreColor(p)}}; text-align:center;">${{p}}%</td>`;
+        }}).join("");
+        // data-v — значение для сортировки по столбцу (время в минутах, проценты числом)
+        return `<tr style="cursor:pointer;" onclick="selectManagerDetail('${{name}}')" title="Открыть разбор ответов менеджера">
+            <td data-v="${{escapeHtml(name)}}" style="font-weight:600;">${{name}}</td>
+            <td data-v="${{n}}" style="text-align:center;">${{n}}</td>
+            <td data-v="${{score}}" style="text-align:center; font-weight:700; color:${{scoreColor(score)}};">${{score}}</td>
+            <td data-v="${{first ?? ''}}" style="text-align:center; color:${{first > MGR_SLOW_MIN ? '#f43f5e' : 'inherit'}};">${{fmtMin(first)}}</td>
+            <td data-v="${{avg ?? ''}}" style="text-align:center;">${{fmtMin(avg)}}</td>
+            <td data-v="${{pct(unanswered, n)}}" style="text-align:center; color:${{unanswered ? '#f43f5e' : 'inherit'}};">${{unanswered}} (${{pct(unanswered, n)}}%)</td>
+            ${{cells}}
+            <td data-v="${{pct(conv, n)}}" style="text-align:center;">${{conv}} (${{pct(conv, n)}}%)</td>
+        </tr>`;
+    }});
+    document.getElementById("mgrQualityBody").innerHTML = rows.join("")
+        || `<tr><td colspan="${{7 + checklist.length}}" style="text-align:center; padding:20px; color:var(--text-muted);">Нет диалогов с менеджерами</td></tr>`;
+    applyQualitySort();
+    const lost = Object.entries(noReply).sort((a, b) => b[1] - a[1]);
+    const total = lost.reduce((s, x) => s + x[1], 0);
+    document.getElementById("mgrNoReply").innerHTML = total
+        ? `⏰ Бот передал менеджеру, но ответа не было: <b>${{total}}</b> — ${{lost.map(([k, v]) => `${{k}}: ${{v}}`).join(", ")}}`
+        : "";
+}}
+
+let hideBotMessages = false;
+let currentModalDialog = null;
+let mgrDetailLimit = 20;
+
+function escapeHtml(text) {{
+    return String(text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}}
+
+function toggleBotMessages() {{
+    hideBotMessages = !hideBotMessages;
+    document.getElementById("botToggleBtn").innerText = hideBotMessages ? "🤖 Показать ответы ИИ" : "🤖 Скрыть ответы ИИ";
+    if (currentModalDialog) renderModalBody(currentModalDialog);
+}}
+
+function populateMgrDetailSelect() {{
+    const counts = {{}};
+    allDialogs.forEach(d => (d.messages || []).forEach(m => {{
+        if (m.role === "operator") counts[m.sender] = (counts[m.sender] || 0) + 1;
+    }}));
+    const select = document.getElementById("mgrDetailSelect");
+    Object.entries(counts).sort((a, b) => b[1] - a[1]).forEach(([name, n]) => {{
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.innerText = `${{name}} (${{n}} ответов)`;
+        select.appendChild(opt);
+    }});
+    select.addEventListener("change", () => {{ mgrDetailLimit = 20; renderManagerDetail(); }});
+}}
+
+function selectManagerDetail(name) {{
+    document.getElementById("mgrDetailSelect").value = name;
+    mgrDetailLimit = 20;
+    renderManagerDetail();
+    document.getElementById("mgrDetail").scrollIntoView({{ behavior: "smooth", block: "start" }});
+}}
+
+function showMoreMgrDialogs() {{
+    mgrDetailLimit += 20;
+    renderManagerDetail();
+}}
+
+const SYSTEM_TEXT_RE = /=== SYSTEM|оцените качество обслуживания|Просим прощения что не смогли/i;
+
+function renderManagerDetail() {{
+    const name = document.getElementById("mgrDetailSelect").value;
+    const box = document.getElementById("mgrDetail");
+    if (!name) {{ box.innerHTML = ""; return; }}
+
+    const dialogs = currentFilteredDialogs.filter(d =>
+        (d.messages || []).some(m => m.role === "operator" && m.sender === name)
+        || (d.mgr && d.mgr.noReply && d.mgr.name === name));
+    const rated = dialogs.filter(d => d.mgr && !d.mgr.noReply && d.mgr.name === name);
+    const noReply = dialogs.filter(d => d.mgr && d.mgr.noReply);
+    const replies = dialogs.flatMap(d => (d.messages || []).filter(m => m.role === "operator" && m.sender === name));
+    const n = rated.length;
+    const pct = (k, total) => total ? Math.round(k * 100 / total) : 0;
+    const score = n ? Math.round(rated.reduce((s, d) => s + d.mgr.score, 0) / n) : 0;
+    const first = median(rated.map(d => d.mgr.firstResponseMin).filter(v => v !== null && v !== undefined));
+    const unanswered = rated.filter(d => d.mgr.unanswered).length;
+    const conv = rated.filter(d => d.isSale || d.isService).length;
+    const avgLen = replies.length ? Math.round(replies.reduce((s, m) => s + (m.text || "").length, 0) / replies.length) : 0;
+
+    const kpi = (title, value, sub = "") => `
+        <div class="kpi-card"><div class="kpi-title">${{title}}</div>
+        <div class="kpi-value" style="font-size:22px;">${{value}}</div><div class="kpi-sub">${{sub}}</div></div>`;
+
+    const bars = (rawData.managerChecklist || []).map(([key, label]) => {{
+        const p = pct(rated.filter(d => d.mgr.checks[key]).length, n);
+        return `<div style="display:flex; align-items:center; gap:10px; margin:6px 0; font-size:13px;">
+            <div style="width:190px;">${{label}}</div>
+            <div style="flex:1; height:10px; background:rgba(255,255,255,0.06); border-radius:5px; overflow:hidden;">
+                <div style="width:${{p}}%; height:100%; background:${{scoreColor(p)}};"></div></div>
+            <div style="width:44px; text-align:right; color:${{scoreColor(p)}};">${{p}}%</div></div>`;
+    }}).join("");
+
+    const flagCounts = {{}};
+    rated.forEach(d => d.mgr.flags.forEach(f => {{
+        const key = f.split(" (")[0];
+        flagCounts[key] = (flagCounts[key] || 0) + 1;
+    }}));
+    if (noReply.length) flagCounts["Передан менеджеру, ответа нет"] = noReply.length;
+    const flagsHtml = Object.entries(flagCounts).sort((a, b) => b[1] - a[1])
+        .map(([f, k]) => `<div style="font-size:13px; margin:5px 0;">⚠️ ${{f}}: <b>${{k}}</b></div>`).join("")
+        || `<div style="font-size:13px; color:var(--text-muted);">Замечаний нет</div>`;
+
+    // Худшие диалоги сначала: без ответа, затем по возрастанию оценки, в конце — где менеджер подключался вторым
+    const others = dialogs.filter(d => !rated.includes(d) && !noReply.includes(d));
+    const ordered = [...noReply, ...rated.sort((a, b) => a.mgr.score - b.mgr.score), ...others];
+    const feed = ordered.slice(0, mgrDetailLimit).map(d => {{
+        const lines = (d.messages || []).filter(m => m.role !== "bot" && !SYSTEM_TEXT_RE.test(m.text || "")).map(m => {{
+            const mine = m.role === "operator" && m.sender === name;
+            const who = m.role === "operator" ? (mine ? "👨‍💼 " + escapeHtml(m.sender) : "👥 " + escapeHtml(m.sender)) : "👤 Клиент";
+            const style = `margin:4px 0; padding:6px 10px; border-radius:8px; font-size:13px;`
+                + ` background:${{mine ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.04)"}};`
+                + (mine ? " border-left:3px solid #a78bfa;" : "");
+            return `<div style="${{style}}"><div style="font-size:11px; color:var(--text-muted);">${{m.time.slice(5, 16)}} · ${{who}}</div>`
+                + `<div style="white-space:pre-wrap;">${{escapeHtml(m.text) || "<i>(вложение)</i>"}}</div></div>`;
+        }}).join("");
+        return `<div style="border:1px solid var(--border-color); border-radius:10px; padding:12px 14px; margin:12px 0;">
+            <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
+                <div><b style="color:#38bdf8; cursor:pointer;" onclick="openChatModal('${{d.sid}}')">#${{d.sid}}</b>
+                    <span style="color:var(--text-muted); font-size:12px;"> ${{d.createdAt}} · ${{escapeHtml(d.client)}} · ${{escapeHtml(d.city)}}</span></div>
+                <div>${{mgrScoreHtml(d.mgr && d.mgr.name === name ? d.mgr : null)}} ${{getOutcomeBadgeHtml(d.outcome, d.isSale, d.isService)}}</div>
+            </div>
+            ${{d.mgr && d.mgr.flags && d.mgr.flags.length ? `<div style="font-size:12px; color:#fbbf24; margin-bottom:6px;">⚠️ ${{d.mgr.flags.join(" • ")}}</div>` : ""}}
+            ${{lines}}
+        </div>`;
+    }}).join("");
+
+    box.innerHTML = `
+        <div style="padding: 18px 20px; border-top: 1px solid var(--border-color);">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+                <h3 style="font-size:15px; font-weight:700;">🔍 Разбор: ${{escapeHtml(name)}} — только ответы менеджера, без ИИ-ассистента</h3>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-reset" style="background:rgba(37,99,235,0.2); color:#93c5fd; border-color:rgba(37,99,235,0.5);" onclick="downloadManagerReport()">📥 Скачать отчёт</button>
+                    <button class="btn-reset" style="background:rgba(255,255,255,0.06); color:inherit; border-color:var(--border-color);" onclick="copyManagerReport()">📋 Скопировать отчёт</button>
+                </div>
+            </div>
+            <div class="kpi-grid">
+                ${{kpi("Диалогов", dialogs.length, `оценено ${{n}}, без ответа после передачи ${{noReply.length}}`)}}
+                ${{kpi("Ответов менеджера", replies.length, `в среднем ${{avgLen}} символов`)}}
+                ${{kpi("Оценка", `<span style="color:${{scoreColor(score)}}">${{score}}</span>`, "чек-лист, 0–100")}}
+                ${{kpi("1-й ответ (медиана)", fmtMin(first), "рабочие минуты")}}
+                ${{kpi("Клиент без ответа", unanswered, `${{pct(unanswered, n)}}% диалогов`)}}
+                ${{kpi("Продажи + сервис", conv, `${{pct(conv, n)}}% диалогов`)}}
+            </div>
+            <div style="display:grid; grid-template-columns: 2fr 1fr; gap:24px; margin-bottom:8px;">
+                <div><div style="font-weight:600; margin-bottom:6px;">Чек-лист</div>${{bars}}</div>
+                <div><div style="font-weight:600; margin-bottom:6px;">Частые замечания</div>${{flagsHtml}}</div>
+            </div>
+            <div style="font-weight:600; margin-top:16px;">Переписка менеджера (сначала проблемные; ответы ИИ скрыты). Показано ${{Math.min(mgrDetailLimit, ordered.length)}} из ${{ordered.length}}</div>
+            ${{feed}}
+            ${{ordered.length > mgrDetailLimit ? `<button class="btn-reset" onclick="showMoreMgrDialogs()">Показать ещё 20</button>` : ""}}
+        </div>`;
+}}
+
 function closeChatModal() {{
     document.getElementById("chatModal").style.display = "none";
 }}
 
 window.addEventListener("DOMContentLoaded", initDashboard);
 </script>
+<script>__REPORT_JS__</script>
 </body>
 </html>
 """
+    with open(CHART_JS_PATH, encoding="utf-8") as f:
+        html_content = html_content.replace("__CHART_JS__", f.read())
+    with open(REPORT_JS_PATH, encoding="utf-8") as f:
+        html_content = html_content.replace("__REPORT_JS__", f.read())
     with open(DASHBOARD_HTML_PATH, "w", encoding="utf-8") as f:
         f.write(html_content)
     logging.info(f"[+] Дашборд сгенерирован: {DASHBOARD_HTML_PATH}")
@@ -1860,10 +2236,10 @@ window.addEventListener("DOMContentLoaded", initDashboard);
 def run_analysis():
     """Основной пайплайн анализа всех CSV файлов в папке dialog/."""
     os.makedirs(DIALOG_DIR, exist_ok=True)
-    csv_files = glob.glob(os.path.join(DIALOG_DIR, "*.csv"))
+    csv_files = glob.glob(os.path.join(INPUT_DIR, "*.csv"))
 
     if not csv_files:
-        logging.warning(f"[!] В папке {DIALOG_DIR} не найдено CSV-файлов выгрузки.")
+        logging.warning(f"[!] В папке {INPUT_DIR} не найдено CSV-файлов выгрузки.")
         return
 
     logging.info(f"Найдено файлов выгрузок: {len(csv_files)}")
@@ -1874,10 +2250,10 @@ def run_analysis():
 def run_analysis(rebuild=False):
     """Основной пайплайн анализа всех CSV файлов в папке dialog/."""
     os.makedirs(DIALOG_DIR, exist_ok=True)
-    csv_files = glob.glob(os.path.join(DIALOG_DIR, "*.csv"))
+    csv_files = glob.glob(os.path.join(INPUT_DIR, "*.csv"))
 
     if not csv_files:
-        logging.warning(f"[!] В папке {DIALOG_DIR} не найдено CSV-файлов выгрузки.")
+        logging.warning(f"[!] В папке {INPUT_DIR} не найдено CSV-файлов выгрузки.")
         return
 
     logging.info(f"Найдено файлов выгрузок: {len(csv_files)}")
@@ -1892,6 +2268,8 @@ def run_analysis(rebuild=False):
                 existing_dialogs = old_data.get("dialogs", [])
                 # Автоматическое дообогащение полей при обновлении схемы
                 for d in existing_dialogs:
+                    if "mgr" not in d:
+                        d["mgr"] = analyze_manager(d.get("messages", []))
                     if "source" not in d or "isSale" not in d:
                         raw_text = d.get("rawTextSnippet", "")
                         msgs = d.get("messages", [])
@@ -1924,6 +2302,7 @@ def run_analysis(rebuild=False):
         "totalFilesProcessed": len(csv_files),
         "totalDialogs": len(all_dialogs),
         "aggregates": aggregates,
+        "managerChecklist": CHECKLIST,
         "dialogs": all_dialogs
     }
 
@@ -1934,15 +2313,44 @@ def run_analysis(rebuild=False):
 
     # 5. Генерация HTML Дашборда
     generate_dashboard_html(export_payload)
+    print_manager_summary(all_dialogs)
+
+def print_manager_summary(dialogs):
+    """Короткая сводка по менеджерам в консоль, чтобы результат был виден сразу после запуска."""
+    from statistics import median
+    by_name = defaultdict(list)
+    no_reply = Counter()
+    for d in dialogs:
+        mgr = d.get("mgr")
+        if not mgr:
+            continue
+        if mgr["noReply"]:
+            no_reply[mgr["name"]] += 1
+        else:
+            by_name[mgr["name"]].append(mgr)
+    if not by_name:
+        return
+    print("\nКачество работы менеджеров (оценка по правилам, 0–100):")
+    print(f"  {'Менеджер':24} {'диалогов':>8} {'оценка':>7} {'1-й ответ, мин':>15} {'без ответа':>11}")
+    for name, items in sorted(by_name.items(), key=lambda x: -len(x[1])):
+        first = [m["firstResponseMin"] for m in items if m.get("firstResponseMin") is not None]
+        score = round(sum(m["score"] for m in items) / len(items))
+        print(f"  {name:24} {len(items):>8} {score:>7} {(round(median(first)) if first else '—'):>15} "
+              f"{sum(1 for m in items if m['unanswered']):>11}")
+    if no_reply:
+        print(f"  Передано менеджеру, но ответа не было: {sum(no_reply.values())} "
+              f"({', '.join(f'{k} — {v}' for k, v in no_reply.most_common())})")
+    print(f"\nДашборд: {DASHBOARD_HTML_PATH}")
+
 
 def watch_directory(interval=5):
     """Мониторит папку dialog/ и автоматически перезапускает анализ при добавлении/изменении CSV."""
-    logging.info(f"[*] Запущен режим наблюдения за папкой: {DIALOG_DIR} (интервал {interval} сек)")
+    logging.info(f"[*] Запущен режим наблюдения за папкой: {INPUT_DIR} (интервал {interval} сек)")
     known_mtimes = {}
 
     while True:
         try:
-            csv_files = glob.glob(os.path.join(DIALOG_DIR, "*.csv"))
+            csv_files = glob.glob(os.path.join(INPUT_DIR, "*.csv"))
             current_mtimes = {f: os.path.getmtime(f) for f in csv_files}
 
             if current_mtimes != known_mtimes:

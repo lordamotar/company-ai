@@ -78,7 +78,7 @@
 * `reprocess_calls.py` — перепрогон звонков с неполным анализом; `retry_errors.py` — возврат файлов из `error/` в очередь.
 * `reset_database.py` — очистка таблиц звонков (осторожно: удаляет данные).
 * `export_db_to_json.py` — выгрузка данных для дашборда (`frontend/calls_data.json`).
-* `dialog/`, `dialog_processor.py` — текстовые диалоги Bitrix24 / WhatsApp (CSV) и их дашборд.
+* `dialog/` — текстовые диалоги Bitrix24 / WhatsApp: CSV в `dialog/input/`, запуск `dialog/dialogs.bat` → `dialog/dashboard.html` (оценка менеджеров и отчёт по менеджеру, без ИИ и без интернета).
 * `server.py` / `app/` — FastAPI бэкенд (REST API, аудиостриминг, аудит правок).
 * `frontend/` — веб-интерфейс аналитики звонков, профили менеджеров, журнал аудита.
 * `docs/` — документация (`LOCAL_SERVER.md` — переход на локальный сервер).
@@ -131,11 +131,12 @@ docker compose up -d
 
 ### 5. Анализ текстовых диалогов Bitrix24 (WhatsApp)
 ```powershell
-.venv\Scripts\python dialog_processor.py
+.venv\Scripts\python dialog\dialog_processor.py
 ```
+Или двойной щелчок по `dialog\dialogs.bat`. Выгрузки CSV кладутся в `dialog\input\`, результат — `dialog\dashboard.html`.
 Для непрерывного мониторинга новых выгрузок CSV:
 ```powershell
-.venv\Scripts\python dialog_processor.py --watch
+.venv\Scripts\python dialog\dialog_processor.py --watch
 ```
 
 ---

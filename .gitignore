@@ -17,7 +17,11 @@ img/
 scratch/
 incoming/
 processed/
-dialog/
+dialog/*
+!dialog/*.py
+!dialog/*.js
+!dialog/*.bat
+!dialog/vendor/
 transcriptions/
 .env
 test/
