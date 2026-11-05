@@ -78,7 +78,7 @@
 * `reprocess_calls.py` — перепрогон звонков с неполным анализом; `retry_errors.py` — возврат файлов из `error/` в очередь.
 * `reset_database.py` — очистка таблиц звонков (осторожно: удаляет данные).
 * `export_db_to_json.py` — выгрузка данных для дашборда (`frontend/calls_data.json`).
-* `dialog/` — текстовые диалоги Bitrix24 / WhatsApp: CSV в `dialog/input/`, запуск `dialog/dialogs.bat` → `dialog/dashboard.html` (оценка менеджеров и отчёт по менеджеру, без ИИ и без интернета).
+* `dialog/` — текстовые диалоги Bitrix24 / WhatsApp: CSV в `dialog/input/`, запуск `dialog/dialogs.bat` → `dialog/dashboard.html` (оценка менеджеров и отчёт по менеджеру, без ИИ и без интернета). Тестовая функция, позже будет прямое подключение к Bitrix24.
 * `server.py` / `app/` — FastAPI бэкенд (REST API, аудиостриминг, аудит правок).
 * `frontend/` — веб-интерфейс аналитики звонков, профили менеджеров, журнал аудита.
 * `docs/` — документация (`LOCAL_SERVER.md` — переход на локальный сервер).
@@ -129,7 +129,10 @@ docker compose up -d
 После запуска интерфейс доступен по адресу: **`http://localhost:8080`**  
 Документация Swagger UI: **`http://localhost:8080/docs`**
 
-### 5. Анализ текстовых диалогов Bitrix24 (WhatsApp)
+### 5. Анализ текстовых диалогов Bitrix24 (WhatsApp) — тестовая функция
+
+> **Тестовая функция.** Сейчас диалоги анализируются из CSV-выгрузки, сделанной вручную. В дальнейшем будет прямое подключение к Bitrix24: диалоги будут забираться автоматически, без скачивания файлов.
+
 ```powershell
 .venv\Scripts\python dialog\dialog_processor.py
 ```
