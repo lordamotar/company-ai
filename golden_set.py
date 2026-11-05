@@ -333,7 +333,8 @@ def cmd_rerun(args):
         mod = _load_module("worker_openrouter", "worker-openrouter.py")
         analyze = mod.transcribe_and_analyze_with_openrouter
     else:
-        sys.exit("Провайдер 'local' появится вместе с локальным пайплайном (см. docs/LOCAL_SERVER.md).")
+        mod = _load_module("local_pipeline", "local_pipeline.py")
+        analyze = mod.transcribe_and_analyze_local
 
     if args.model:
         mod.get_configured_models = lambda: [args.model]

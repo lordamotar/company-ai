@@ -315,7 +315,7 @@ function renderCallsTable(data, keepPage = false) {
                         <span style="color: #e2e8f0; font-size: 12px; font-family: monospace;">${call.duration || "—"}</span>
                     </div>
                 </td>
-                <td>${emotionBadge}</td>
+                <td class="tone-only">${emotionBadge}</td>
                 <td>${(call.csat !== null && call.csat !== undefined && call.csat !== "") ? `<span class="stars-score">⭐ ${Number(call.csat).toFixed(1)}</span>` : `<span class="text-muted" style="font-size: 11.5px;">Не оценен</span>`}</td>
                 <td class="text-right" style="white-space: nowrap;">
                     <button class="btn-icon" style="margin-right: 4px; padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;" onclick="event.stopPropagation(); openEditCallModal(${call.id});" title="Редактировать имя менеджера или город">
@@ -603,7 +603,7 @@ function renderManagers(data, keepPage = false) {
                 </div>
                 <div class="m-stat-item">
                     <span class="m-stat-lbl">Дружелюбие</span>
-                    <span class="m-stat-val">${happyPct}% позитив</span>
+                    <span class="m-stat-val tone-only">${happyPct}% позитив</span>
                 </div>
                 <div class="m-stat-item">
                     <span class="m-stat-lbl">Статус</span>
@@ -876,7 +876,7 @@ function openManagerAnalytics(managerName) {
             <td>
                 <span class="duration-badge">${c.duration}</span>
             </td>
-            <td>
+            <td class="tone-only">
                 <span class="emotion-badge ${c.emotionClass || "happy"}">
                     ${c.emotionClass === "happy" ? "😊" : (c.emotionClass === "sad" ? "🙁" : "😐")} ${c.emotion}
                 </span>
@@ -1286,7 +1286,7 @@ function openClientModal(phoneNumber) {
                             <span class="client-detail-label">Сумма заказа:</span>
                             <span class="client-detail-val highlight">${call.orderSum || "0 ₸"}</span>
                         </div>
-                        <div class="client-detail-item">
+                        <div class="client-detail-item tone-only">
                             <span class="client-detail-label">Tone of Voice:</span>
                             <span class="client-detail-val">${call.emotion || "Радость"} (${call.emotionPct || "75%"})</span>
                         </div>
@@ -1434,6 +1434,9 @@ function switchView(viewId) {
         if (heading) heading.innerText = "Справочник филиалов";
         if (subheading) subheading.innerText = "Города, названия и адреса филиалов: к ним приводятся названия, которые клиенты и менеджеры называют в звонках";
         if (typeof window.initBranches === "function") window.initBranches();
+    } else if (viewId === "view-settings") {
+        if (heading) heading.innerText = "Настройки";
+        if (subheading) subheading.innerText = "Что система учитывает при анализе звонков";
     }
 }
 
@@ -2629,7 +2632,7 @@ function exportCurrentCall() {
         if (m.sentiment === "positive" || m.sentiment === "ПОЗИТИВ") { sCls = "positive"; sLbl = "ПОЗИТИВ"; }
         else if (m.sentiment === "negative" || m.sentiment === "НЕГАТИВ") { sCls = "negative"; sLbl = "НЕГАТИВ"; }
         const timeTag = (typeof formatAudioTime === "function") ? formatAudioTime((idx / dialogue.length) * totalSec) : "";
-        return `<div class="msg ${isMgr ? "mgr" : "cli"}"><div class="who"><span>${esc(m.speaker || (isMgr ? "Менеджер" : "Клиент"))}${timeTag ? ` <span class="time">≈ ${esc(timeTag)}</span>` : ""}</span><span class="sent ${sCls}">${sLbl}</span></div><div class="txt">${val(m.text)}</div></div>`;
+        return `<div class="msg ${isMgr ? "mgr" : "cli"}"><div class="who"><span>${esc(m.speaker || (isMgr ? "Менеджер" : "Клиент"))}${timeTag ? ` <span class="time">≈ ${esc(timeTag)}</span>` : ""}</span>${toneEnabled ? `<span class="sent ${sCls}">${sLbl}</span>` : ""}</div><div class="txt">${val(m.text)}</div></div>`;
     }).join("");
 
     const tags = Array.isArray(call.callTags) ? call.callTags.map(t => `<span class="chip">${esc(t)}</span>`).join(" ") : "";
@@ -2731,8 +2734,8 @@ function exportCurrentCall() {
         ${(call.isLegalEntity || call.companyName || call.clientBin) ? row("Юрлицо", formatLegalLabel(call)) : ""}
     </table>
 
-    <h2>Тон-войс и акустика</h2>
-    <div class="grid-2">
+    <h2>${toneEnabled ? "Тон-войс и акустика" : "Акустика"}</h2>
+    ${toneEnabled ? `<div class="grid-2">
         <table>
             <tr><th colspan="2" style="width:auto;color:#0f172a;">Менеджер</th></tr>
             ${row("Тон", mt.dominant)}
@@ -2745,9 +2748,9 @@ function exportCurrentCall() {
             ${row("Настроение", ct.sentimentStart ? `${ct.sentimentStart} → ${ct.sentimentEnd || "—"}` : null)}
             ${row("Позитив / нейтрал / негатив", ct.happy !== undefined ? `${ct.happy}% / ${ct.neutral}% / ${(Number(ct.sad) || 0) + (Number(ct.angry) || 0)}%` : null)}
         </table>
-    </div>
+    </div>` : ""}
     <table style="margin-top:10px;">
-        ${row("Общая эмоция звонка", call.emotion ? `${call.emotion}${call.emotionPct ? " (" + call.emotionPct + ")" : ""}` : null)}
+        ${toneEnabled ? row("Общая эмоция звонка", call.emotion ? `${call.emotion}${call.emotionPct ? " (" + call.emotionPct + ")" : ""}` : null) : ""}
         ${row("Темп речи", ac.tempo)}
         ${row("Паузы / тишина", ac.silence)}
         ${row("Громкие моменты", ac.loudMoments)}
@@ -2897,9 +2900,50 @@ async function saveCallEdits() {
     }
 }
 
+// Настройка «Анализ интонаций»: блоки с классом tone-only скрываются через body.tone-off (см. style.css)
+let toneEnabled = true;
+
+function applyToneSetting(enabled) {
+    toneEnabled = enabled;
+    document.body.classList.toggle("tone-off", !enabled);
+    const toggle = document.getElementById("toneEnabledToggle");
+    if (toggle) toggle.checked = enabled;
+    const emotionFilter = document.getElementById("emotionFilter");
+    if (!enabled && emotionFilter && emotionFilter.value !== "all") {
+        emotionFilter.value = "all";
+        applyCallsFilters();
+    }
+}
+
+async function loadSystemSettings() {
+    try {
+        const res = await fetch("/api/system/settings?t=" + Date.now());
+        if (res.ok) applyToneSetting((await res.json()).toneEnabled !== false);
+    } catch (e) {
+        // Без API (Live Server) остаётся значение по умолчанию
+    }
+}
+
+async function saveToneSetting(enabled) {
+    try {
+        const res = await fetch("/api/system/settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ toneEnabled: enabled })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        applyToneSetting(enabled);
+        await loadCallsData(true);
+    } catch (e) {
+        applyToneSetting(!enabled);
+        alert("Не удалось сохранить настройку: " + e.message);
+    }
+}
+
 // Загрузка реальных данных из базы данных через REST API FastAPI (/api/calls и /api/audit) с автоматическим фолбэком
 async function loadCallsData(keepPage = true) {
     try {
+        await loadSystemSettings();
         let freshData = null;
         let freshAudit = null;
 
@@ -3258,6 +3302,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (outcomeFilter) {
         outcomeFilter.onchange = applyCallsFilters;
     }
+
+    const toneToggle = document.getElementById("toneEnabledToggle");
+    if (toneToggle) toneToggle.onchange = () => saveToneSetting(toneToggle.checked);
 
     // Фильтр по эмоциям
     const emotionFilter = document.getElementById("emotionFilter");

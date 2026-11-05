@@ -23,6 +23,8 @@ dialog/*
 !dialog/*.bat
 !dialog/vendor/
 transcriptions/
+wishper/*
+!wishper/whisper_test.py
 .env
 test/
 __pycache__/

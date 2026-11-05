@@ -286,8 +286,39 @@ def _inherit_client_names(calls, named_call_ids):
     return filled
 
 
+def _ensure_settings_table(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key VARCHAR(64) PRIMARY KEY,
+            value JSONB NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
+
+def get_tone_enabled():
+    """Включён ли анализ интонаций. Меняется на странице «Настройки», по умолчанию включён."""
+    with psycopg2.connect(**DB_CONFIG) as conn, conn.cursor() as cursor:
+        _ensure_settings_table(cursor)
+        cursor.execute("SELECT value FROM app_settings WHERE key = 'tone_enabled';")
+        row = cursor.fetchone()
+    return True if row is None else bool(row[0])
+
+
+def set_tone_enabled(enabled):
+    with psycopg2.connect(**DB_CONFIG) as conn, conn.cursor() as cursor:
+        _ensure_settings_table(cursor)
+        cursor.execute("""
+            INSERT INTO app_settings (key, value) VALUES ('tone_enabled', %s)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP;
+        """, (json.dumps(bool(enabled)),))
+
+
 def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
     try:
+        # Интонации выключаются здесь, в единой точке выдачи: эмоции, тональность и конфликт не попадают
+        # ни на экран, ни в расчёт оценок. В базе данные не меняются, поэтому настройка обратима.
+        tone_enabled = get_tone_enabled()
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
         # Колонка эмоции реплик (для старых баз, где миграция еще не применялась)
@@ -354,7 +385,11 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 manager_politeness = max(1, min(5, round(manager_politeness / 20)))
 
             conflict = bool(r[28]) if r[28] is not None else False
-            summary = r[30] if len(r) > 30 and r[30] else (raw_text[:200] + "..." if raw_text else "Транскрипция звонка.")
+            summary = r[30] if tone_enabled and len(r) > 30 and r[30] else (raw_text[:200] + "..." if raw_text else "Транскрипция звонка.")
+            if not tone_enabled:
+                dominant_emotion, emotion_conf = "Нейтральный", 0.0
+                happy_score, neutral_score, sad_score, angry_score = 0.0, 100.0, 0.0, 0.0
+                conflict = False
 
             raw_sale_status = r[31] if len(r) > 31 and r[31] else "Консультация"
             status_map = {
@@ -402,6 +437,8 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                     "emotion": seg_em,
                     "pct": float(s[3])
                 })
+            if not tone_enabled:
+                timeline = []
 
             cursor.execute("""
                 SELECT line_number, speaker, phrase_text, sentiment_label, confidence, emotion
@@ -416,12 +453,14 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 role = "manager" if "Менеджер" in speaker else "client"
                 sent_lbl = l[3] or "НЕЙТРАЛЬНЫЙ"
                 sent_class = "positive" if "ПОЗИТИВ" in sent_lbl else ("negative" if "НЕГАТИВ" in sent_lbl else "neutral")
+                if not tone_enabled:
+                    sent_class = "neutral"
                 dialogue.append({
                     "speaker": speaker,
                     "role": role,
                     "text": l[2],
                     "sentiment": sent_class,
-                    "emotion": l[5] if len(l) > 5 else None
+                    "emotion": l[5] if tone_enabled and len(l) > 5 else None
                 })
 
             if not dialogue and raw_text:
@@ -616,8 +655,8 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
             mgr_happy_pct = round((mgr_pos / mgr_total) * 100) if (mgr_total > 0 and mgr_pos > 0) else 0
             mgr_neutral_pct = max(100 - mgr_happy_pct - mgr_sad_pct - mgr_angry_pct, 0)
 
-            cust_start = str(r[24]) if len(r) > 24 and r[24] is not None else "Не определено"
-            cust_end = str(r[25]) if len(r) > 25 and r[25] is not None else "Не определено"
+            cust_start = str(r[24]) if tone_enabled and len(r) > 24 and r[24] is not None else "Не определено"
+            cust_end = str(r[25]) if tone_enabled and len(r) > 25 and r[25] is not None else "Не определено"
 
             season_val = db_tire_season or detect_season(raw_text) or "Не указано"
 
@@ -680,8 +719,8 @@ def export_calls_to_json(output_file=DEFAULT_OUTPUT_JSON, write_to_file=True):
                 "statusClass": "badge-success",
                 "managerPoliteness": f"{manager_politeness} / 5" if manager_politeness is not None else "Не оценено",
                 "conflict": conflict,
-                "conflictReason": r[29] if len(r) > 29 and r[29] else ("Клиент выразил недовольство условиями" if conflict else None),
-                "summary": summary,
+                "conflictReason": r[29] if tone_enabled and len(r) > 29 and r[29] else ("Клиент выразил недовольство условиями" if conflict else None),
+                "summary": summary if tone_enabled else (db_call_summary or summary),
                 "opportunity": "Предложить сезонное хранение шин и расширенную гарантию." if not upsell_passed else "Все допродажи выполнены успешно.",
                 "emotionsDist": {
                     "happy": happy_score,

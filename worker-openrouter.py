@@ -444,7 +444,13 @@ def transcribe_and_analyze_with_openrouter(file_path, output_txt_path=None, meta
     Единый мультимодальный вызов OpenRouter API:
     Передает аудиофайл (base64) в совместимую модель Gemini на OpenRouter,
     получает дословную транскрипцию со спикерами и полный аудит звонка.
+
+    Защита данных, как в worker.py: читается обезличенная временная копия (без номера телефона и даты в имени),
+    в запросе нет названия компании, а OpenRouter может отдать запрос только провайдеру,
+    который не хранит данные и не обучает на них модели (provider.data_collection = deny).
     """
+    from analysis_runs import make_anonymized_copy, remove_quietly
+
     abs_path = os.path.abspath(file_path)
     if not os.path.exists(abs_path):
         raise FileNotFoundError(f"Файл не найден: {abs_path}")
@@ -454,8 +460,12 @@ def transcribe_and_analyze_with_openrouter(file_path, output_txt_path=None, meta
     models_to_try = get_configured_models()
 
     logging.info(f"Кодирование аудио {filename} в base64 для передачи через OpenRouter...")
-    with open(abs_path, "rb") as af:
-        audio_bytes = af.read()
+    anon_path = make_anonymized_copy(abs_path)
+    try:
+        with open(anon_path, "rb") as af:
+            audio_bytes = af.read()
+    finally:
+        remove_quietly(anon_path)
     base64_audio = base64.b64encode(audio_bytes).decode("utf-8")
     audio_format = get_audio_format_for_openrouter(abs_path)
     logging.info(f"Аудио {filename} закодировано ({len(audio_bytes) / 1024:.1f} КБ, формат: {audio_format}).")
@@ -464,8 +474,6 @@ def transcribe_and_analyze_with_openrouter(file_path, output_txt_path=None, meta
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://aikos.kz",
-        "X-Title": "Aikos Call AI Analyzer"
     }
 
     result_data = None
@@ -500,7 +508,9 @@ def transcribe_and_analyze_with_openrouter(file_path, output_txt_path=None, meta
                             }
                         ],
                         "response_format": {"type": "json_object"},
-                        "temperature": 0.2
+                        "temperature": 0.2,
+                        # только провайдеры, которые не хранят запросы и не обучают на них модели
+                        "provider": {"data_collection": "deny"},
                     }
 
                     resp = http_client.post(url, headers=headers, json=payload)

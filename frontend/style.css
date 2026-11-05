@@ -2433,4 +2433,76 @@ body {
     font-size: 13px;
 }
 
+/* Настройка «Анализ интонаций» выключена */
+body.tone-off .tone-only,
+body.tone-off .sentiment-tag,
+body.tone-off #modalTimelineTrack {
+    display: none !important;
+}
 
+/* Страница настроек */
+.settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    max-width: 760px;
+}
+
+.settings-note {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+    margin-top: 6px;
+}
+
+.settings-switch {
+    position: relative;
+    flex: 0 0 48px;
+    height: 26px;
+    cursor: pointer;
+}
+
+.settings-switch input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.settings-slider {
+    position: absolute;
+    inset: 0;
+    border-radius: 13px;
+    background: rgba(148, 163, 184, 0.35);
+    transition: background 0.2s;
+    pointer-events: none;
+}
+
+.settings-slider::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+}
+
+.settings-switch input:checked + .settings-slider {
+    background: #38bdf8;
+}
+
+.settings-switch input:checked + .settings-slider::after {
+    transform: translateX(22px);
+}
+
+.settings-switch input:focus-visible + .settings-slider {
+    outline: 2px solid #38bdf8;
+    outline-offset: 2px;
+}

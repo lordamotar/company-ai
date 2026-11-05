@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=3.0">
+    <link rel="stylesheet" href="style.css?v=3.1">
     <link rel="stylesheet" href="manager_analysis.css?v=1.1">
     <link rel="stylesheet" href="branches.css?v=1.0">
 </head>
@@ -66,6 +66,10 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                     <span>Филиалы</span>
                     <span class="badge-count" id="totalBranchesBadge">0</span>
+                </a>
+                <a href="#settings" class="nav-item" data-view="view-settings" data-title="Настройки">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+                    <span>Настройки</span>
                 </a>
             </nav>
 
@@ -136,7 +140,7 @@
                         <div class="kpi-trend positive">Стандарт обслуживания</div>
                     </div>
 
-                    <div class="kpi-card interactive-kpi" id="kpiToneCard" title="Нажмите, чтобы отфильтровать звонки с конфликтами и претензиями">
+                    <div class="kpi-card interactive-kpi tone-only" id="kpiToneCard" title="Нажмите, чтобы отфильтровать звонки с конфликтами и претензиями">
                         <div class="kpi-header">
                             <span class="kpi-label">Позитивный Tone of Voice</span>
                             <span class="kpi-icon yellow">😊</span>
@@ -181,7 +185,7 @@
                             <option value="consultation">⚪ Консультации</option>
                         </select>
 
-                        <select id="emotionFilter" class="filter-select">
+                        <select id="emotionFilter" class="filter-select tone-only">
                             <option value="all">Все эмоции (Tone of Voice)</option>
                             <option value="happy">Радость / Дружелюбно</option>
                             <option value="neutral">Нейтрально</option>
@@ -220,7 +224,7 @@
                                 <th>Результат звонка</th>
                                 <th>Тема / Товары</th>
                                 <th>Длительность</th>
-                                <th>Тон голоса (Wav2Vec2)</th>
+                                <th class="tone-only">Тон голоса</th>
                                 <th>CSAT AI</th>
                                 <th class="text-right">Действие</th>
                             </tr>
@@ -268,10 +272,10 @@
                     </div>
 
                     <!-- Тональность голоса и эмоциональный фон -->
-                    <div class="dash-card">
+                    <div class="dash-card tone-only">
                         <div class="dash-card-header">
                             <span class="dash-card-title">
-                                🎙️ Сводный Tone of Voice (Wav2Vec2)
+                                🎙️ Сводный Tone of Voice
                             </span>
                             <span class="badge badge-success" id="dashEmotionDominantBadge">Дружелюбный фон</span>
                         </div>
@@ -439,7 +443,7 @@
                                 <th>Обращений</th>
                                 <th>Интересующий типоразмер / Авто</th>
                                 <th>Ключевые темы и вопросы</th>
-                                <th>Tone of Voice</th>
+                                <th class="tone-only">Tone of Voice</th>
                                 <th>Менеджеры</th>
                                 <th>Последний контакт</th>
                                 <th class="text-right">История</th>
@@ -563,6 +567,21 @@
                             <button class="page-btn page-nav" id="auditPageLast" title="Последняя страница">»</button>
                         </div>
                     </div>
+                </section>
+            </div>
+
+            <!-- ЭКРАН 7: НАСТРОЙКИ СИСТЕМЫ -->
+            <div id="view-settings" class="page-view">
+                <section class="card settings-row">
+                    <div>
+                        <h3>Анализ интонаций</h3>
+                        <p class="settings-note">Эмоции, тональность реплик, настроение клиента и отметка конфликта.</p>
+                        <p class="settings-note">Если выключить, они исчезнут с экранов и из отчётов и перестанут влиять на оценки менеджеров. Жалобы по-прежнему видны через категорию звонка. Данные в базе не меняются: при включении всё вернётся без повторного анализа.</p>
+                    </div>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="toneEnabledToggle" checked aria-label="Анализ интонаций">
+                        <span class="settings-slider"></span>
+                    </label>
                 </section>
             </div>
 
@@ -858,7 +877,7 @@
                 <div class="tab-content" id="tab-tone">
                     <div class="tone-analytics-grid">
                         <!-- 1. Tone of Voice МЕНЕДЖЕРА -->
-                        <div class="card tone-card">
+                        <div class="card tone-card tone-only">
                             <div class="tone-card-header">
                                 <h3>👨‍💼 Tone of Voice Менеджера</h3>
                                 <span class="badge badge-primary" id="modalMgrToneDominant">Дружелюбие</span>
@@ -887,7 +906,7 @@
                         </div>
 
                         <!-- 2. Tone of Voice КЛИЕНТА -->
-                        <div class="card tone-card">
+                        <div class="card tone-card tone-only">
                             <div class="tone-card-header">
                                 <h3>👤 Tone of Voice Клиента</h3>
                                 <span class="badge badge-success" id="modalClientToneDominant">Лояльный</span>
@@ -966,7 +985,7 @@
                             <div class="modal-badge-row">
                                 <span class="badge badge-success" id="mgrModalCsatBadge">⭐ 5.0 / 5.0 CSAT</span>
                                 <span class="badge badge-primary" id="mgrModalCallsCountBadge">1 звонок(ов) в базе</span>
-                                <span class="badge badge-outline" id="mgrModalToneBadge">100% Позитив</span>
+                                <span class="badge badge-outline tone-only" id="mgrModalToneBadge">100% Позитив</span>
                             </div>
                             <h2 class="modal-title" id="mgrModalName">Жандос</h2>
                             <p class="manager-modal-subtitle" id="mgrModalSubtitle">Менеджер отдела продаж и консультаций • Филиал: Алматы</p>
@@ -1084,9 +1103,9 @@
                 <!-- ВКЛАДКА 3: TONE OF VOICE & АКУСТИКА -->
                 <div class="mgr-tab-content" id="mgr-tab-tone">
                     <div class="tone-analytics-grid">
-                        <div class="card">
+                        <div class="card tone-only">
                             <h3>🎙️ Эмоциональный баланс речи менеджера</h3>
-                            <p class="card-subtitle">Анализ эмоционального фона по моделям Wav2Vec2 и RuBERT</p>
+                            <p class="card-subtitle">Эмоциональный фон по репликам менеджера</p>
                             
                             <div class="script-bars-list" id="mgrToneBarsList">
                                 <!-- Заполняется в JS -->
@@ -1114,7 +1133,7 @@
                                     <th>Клиент</th>
                                     <th>Тема / Товары</th>
                                     <th>Длительность</th>
-                                    <th>Эмоция</th>
+                                    <th class="tone-only">Эмоция</th>
                                     <th>CSAT</th>
                                     <th>Скрипт</th>
                                     <th class="text-right">Действие</th>
@@ -1191,7 +1210,7 @@
                             <div class="mgr-kpi-label">Сумма заказов / спроса</div>
                             <div class="mgr-kpi-sub" id="clientKpiOrderCount">Зафиксировано покупок</div>
                         </div>
-                        <div class="mgr-kpi-card">
+                        <div class="mgr-kpi-card tone-only">
                             <div class="mgr-kpi-val" id="clientKpiTone">😊 100%</div>
                             <div class="mgr-kpi-label">Tone of Voice клиента</div>
                             <div class="mgr-kpi-sub">Лояльность и вежливость</div>
@@ -1427,7 +1446,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=4.3"></script>
+    <script src="app.js?v=4.4"></script>
     <script src="manager_analysis.js?v=1.2"></script>
     <script src="branches.js?v=1.0"></script>
 </body>
